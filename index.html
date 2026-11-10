@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Poké Binder — Collection Tracker</title>
+<style>
+:root{--bg:#10131c;--card:#1a1f2e;--card2:#222939;--line:#2e3650;--text:#eef1f8;--mut:#93a0bd;--red:#ee4b4b;--yel:#ffcb05;--blu:#3b82f6;--grn:#34d399}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding-bottom:env(safe-area-inset-bottom)}
+header{position:sticky;top:0;z-index:5;background:linear-gradient(180deg,#1b2033,#141828);border-bottom:1px solid var(--line);padding:calc(10px + env(safe-area-inset-top)) 14px 0}
+h1{font-size:18px;margin:0 0 8px;display:flex;align-items:center;gap:8px}
+h1 i{width:18px;height:18px;border-radius:50%;background:linear-gradient(180deg,var(--red) 46%,#222 46% 54%,#fff 54%);border:2px solid #222;display:inline-block}
+nav{display:flex;gap:4px;overflow-x:auto}
+nav button{flex:1;background:none;border:0;color:var(--mut);padding:10px 8px;font:600 14px inherit;border-bottom:3px solid transparent;white-space:nowrap}
+nav button.on{color:var(--yel);border-color:var(--yel)}
+main{padding:14px;max-width:1100px;margin:0 auto}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+input,select,textarea{background:var(--card);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:10px 12px;font:inherit;min-width:0}
+input[type=text],input[type=search]{flex:1 1 150px}
+button.btn{background:var(--blu);color:#fff;border:0;border-radius:10px;padding:10px 14px;font:600 14px inherit}
+button.btn.alt{background:var(--card2);border:1px solid var(--line);color:var(--text)}
+button.btn.good{background:var(--grn);color:#062b1e}
+button.btn.bad{background:#7f1d1d}
+button.btn.sm{padding:6px 10px;font-size:13px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px}
+.c{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px;display:flex;flex-direction:column;gap:6px;position:relative}
+.c img,.ph{width:100%;aspect-ratio:245/342;object-fit:contain;border-radius:8px;background:var(--card2);cursor:zoom-in}
+.ph{display:flex;align-items:center;justify-content:center;text-align:center;color:var(--mut);font-size:12px;padding:6px}
+.c b{font-size:13px;line-height:1.2}
+.c small{color:var(--mut);font-size:12px}
+.badge{position:absolute;top:6px;right:6px;background:var(--yel);color:#222;font-weight:800;border-radius:999px;padding:1px 8px;font-size:13px}
+.own{position:absolute;top:6px;left:6px;background:#000a;border-radius:999px;padding:1px 8px;font-size:11px}
+.acts{display:flex;gap:4px;flex-wrap:wrap;align-items:center}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
+.stat b{display:block;font-size:24px;color:var(--yel)}
+.stat span{color:var(--mut);font-size:12px}
+.bar{display:flex;align-items:center;gap:8px;margin:5px 0;font-size:13px}
+.bar div{height:10px;border-radius:5px;background:var(--blu)}
+.bar span:first-child{width:140px;flex:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.msg{color:var(--mut);padding:20px;text-align:center}
+dialog{background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:14px;max-width:min(94vw,420px);width:100%;padding:16px}
+dialog::backdrop{background:#000b}
+dialog img{width:100%;border-radius:10px}
+.f{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.f label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--mut)}
+.f .two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+h3{margin:18px 0 6px}
+.note{color:var(--mut);font-size:12px}
+</style>
+</head>
+<body>
+<header>
+  <h1><i></i> Poké Binder</h1>
+  <nav id="nav">
+    <button data-t="col" class="on">Collection</button>
+    <button data-t="add">Find &amp; Add</button>
+    <button data-t="wish">Wishlist</button>
+    <button data-t="stats">Stats</button>
+    <button data-t="data">Backup</button>
+  </nav>
+</header>
+<main id="main"></main>
+<dialog id="dlg"></dialog>
+
+<script>
+(function(){
+"use strict";
+var KEY="pokebinder.v1";
+var API="https://api.pokemontcg.io/v2/cards";
+var CONDS=["NM","LP","MP","HP","DMG"];
+var OWNERS=["Me","Wife","Shared"];
+var S={cards:[],wish:[],tab:"col",res:[],q:{name:"",set:""},status:"",filter:{text:"",owner:"All",sort:"added"},apikey:""};
+
+function load(){
+  try{var d=JSON.parse(localStorage.getItem(KEY)||"{}");S.cards=d.cards||[];S.wish=d.wish||[];S.apikey=d.apikey||"";}catch(e){}
+}
+function save(){
+  try{localStorage.setItem(KEY,JSON.stringify({cards:S.cards,wish:S.wish,apikey:S.apikey}));}catch(e){toast("Could not save (storage full or blocked)");}
+}
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});}
+function money(n){return "$"+(n||0).toFixed(2);}
+function uid(){return "m"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
+function toast(t){var d=document.createElement("div");d.textContent=t;d.style.cssText="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#000d;color:#fff;padding:10px 16px;border-radius:999px;z-index:99;font-size:14px";document.body.appendChild(d);setTimeout(function(){d.remove();},2200);}
+function $(id){return document.getElementById(id);}
+
+function price(card){
+  var p=card.tcgplayer&&card.tcgplayer.prices;if(!p)return 0;
+  var best=0;Object.keys(p).forEach(function(k){var m=p[k]&&(p[k].market||p[k].mid);if(m&&m>best)best=m;});
+  return best;
+}
+function snap(card){
+  return {cid:card.id,name:card.name,set:(card.set&&card.set.name)||"",num:card.number||"",rarity:card.rarity||"",
+    types:(card.types||[]).join("/"),supertype:card.supertype||"",
+    small:(card.images&&card.images.small)||"",large:(card.images&&card.images.large)||"",price:price(card),
+    year:(card.set&&card.set.releaseDate||"").slice(0,4)};
+}
+
+/* ---------- search ---------- */
+function search(){
+  var n=S.q.name.trim(),st=S.q.set.trim();
+  if(!n&&!st){S.status="Type a Pokémon name or a card number like 1/103.";render();return;}
+  var parts=[],numRe=/(\d+)\s*\/\s*(\d+)/;
+  [n,st].forEach(function(s,i){
+    if(!s)return;
+    var m=s.match(numRe);
+    if(m){ // card number like 1/103
+      parts.push("number:"+parseInt(m[1],10));parts.push("set.printedTotal:"+parseInt(m[2],10));
+      s=s.replace(numRe,"").trim();
+    }
+    if(!s)return;
+    var clean=s.replace(/"/g,"");
+    if(i===0){
+      var m2=clean.match(/^(.*?)\s+(\d+)$/);
+      if(m2){parts.push('name:"'+m2[1]+'*"');parts.push("number:"+parseInt(m2[2],10));}
+      else parts.push('name:"'+clean+'*"');
+    }else parts.push('set.name:"'+clean+'*"');
+  });
+  var url=API+"?q="+encodeURIComponent(parts.join(" "))+"&pageSize=36&orderBy=-set.releaseDate";
+  S.status="Searching…";S.res=[];render();
+  var done=false;
+  var timer=setTimeout(function(){if(done)return;done=true;S.status="The card database is slow right now. Tap Search to try again.";render();},30000);
+  var opts=S.apikey?{headers:{"X-Api-Key":S.apikey}}:undefined;
+  fetch(url,opts).then(function(r){
+    if(!r.ok)throw new Error("HTTP "+r.status);return r.json();
+  }).then(function(j){
+    if(done)return;done=true;clearTimeout(timer);
+    S.res=j.data||[];S.status=S.res.length?S.res.length+" result"+(S.res.length>1?"s":"")+" (newest sets first)":"No cards found. Try a shorter name.";render();
+  }).catch(function(e){
+    if(done)return;done=true;clearTimeout(timer);
+    S.status="Search failed: "+(e&&e.message||e)+". If this keeps happening, open the file directly in your browser, or add cards manually.";render();
+  });
+}
+
+/* ---------- actions ---------- */
+function addToCollection(c,opts){
+  var same=S.cards.find(function(x){return x.cid===c.cid&&x.cond===opts.cond&&x.owner===opts.owner&&!!x.foil===!!opts.foil;});
+  if(same){same.qty+=opts.qty;}
+  else S.cards.push(Object.assign({},c,{id:uid(),qty:opts.qty,cond:opts.cond,owner:opts.owner,foil:!!opts.foil,notes:opts.notes||"",added:Date.now()}));
+  S.wish=S.wish.filter(function(w){return w.cid!==c.cid;});
+  save();
+}
+function openAdd(c,toWish){
+  var d=$("dlg");
+  d.innerHTML='<img src="'+esc(c.large||c.small)+'" alt="" onerror="this.style.display=\'none\'">'+
+   '<b style="display:block;margin-top:8px">'+esc(c.name)+'</b><div class="note">'+esc(c.set)+' · #'+esc(c.num)+' · '+esc(c.rarity)+(c.price?' · ~'+money(c.price):'')+'</div>'+
+   (toWish?'':'<div class="f"><div class="two"><label>Quantity<input id="aq" type="number" min="1" value="1"></label><label>Condition<select id="ac">'+CONDS.map(function(x){return "<option>"+x+"</option>";}).join("")+'</select></label></div>'+
+   '<div class="two"><label>Owner<select id="ao">'+OWNERS.map(function(x){return "<option>"+x+"</option>";}).join("")+'</select></label><label>Finish<select id="af"><option value="">Non-holo / standard</option><option value="1">Holo / reverse / foil</option></select></label></div>'+
+   '<label>Notes<input id="an" type="text" placeholder="optional"></label></div>')+
+   '<div class="row" style="margin:12px 0 0"><button class="btn alt" id="ax">Close</button>'+
+   (toWish?'<button class="btn good" id="ago">Add to wishlist</button>':'<button class="btn alt" id="aw">+ Wishlist</button><button class="btn good" id="ago">Add to collection</button>')+'</div>';
+  d.showModal();
+  $("ax").onclick=function(){d.close();};
+  var w=$("aw");if(w)w.onclick=function(){addWish(c);d.close();};
+  $("ago").onclick=function(){
+    if(toWish){addWish(c);}
+    else{addToCollection(c,{qty:Math.max(1,parseInt($("aq").value)||1),cond:$("ac").value,owner:$("ao").value,foil:$("af").value==="1",notes:$("an").value});toast("Added "+c.name);}
+    d.close();render();
+  };
+}
+function addWish(c){
+  if(!S.wish.some(function(w){return w.cid===c.cid;})){S.wish.push(Object.assign({},c,{id:uid(),added:Date.now()}));save();toast("Wishlisted "+c.name);}
+}
+function zoom(c){
+  var d=$("dlg");d.innerHTML='<img src="'+esc(c.large||c.small)+'" alt=""><div class="row" style="margin:12px 0 0"><button class="btn alt" id="zx">Close</button></div>';
+  d.showModal();$("zx").onclick=function(){d.close();};
+}
+function manualForm(){
+  var d=$("dlg");
+  d.innerHTML='<b>Add a card manually</b><div class="f"><label>Name<input id="mn" type="text"></label><div class="two"><label>Set<input id="ms" type="text"></label><label>Number<input id="mu" type="text"></label></div><label>Image URL (optional)<input id="mi" type="text" placeholder="https://…"></label><label>Value (optional)<input id="mp" type="number" step="0.01"></label></div><div class="row" style="margin:12px 0 0"><button class="btn alt" id="mx">Cancel</button><button class="btn good" id="mok">Add</button></div>';
+  d.showModal();$("mx").onclick=function(){d.close();};
+  $("mok").onclick=function(){
+    var n=$("mn").value.trim();if(!n){toast("Name needed");return;}
+    var c={cid:"manual-"+uid(),name:n,set:$("ms").value,num:$("mu").value,rarity:"",types:"",supertype:"",small:$("mi").value,large:$("mi").value,price:parseFloat($("mp").value)||0,year:""};
+    addToCollection(c,{qty:1,cond:"NM",owner:"Me",foil:false});d.close();render();toast("Added "+n);
+  };
+}
+
+/* ---------- views ---------- */
+function cardTile(c,mode){
+  var img=c.small?'<img loading="lazy" src="'+esc(c.small)+'" alt="'+esc(c.name)+'" data-z="'+esc(c.id||c.cid)+'" onerror="this.outerHTML=\'<div class=ph>'+esc(c.name).replace(/'/g,"")+'</div>\'">':'<div class="ph">'+esc(c.name)+'</div>';
+  var h='<div class="c">'+img;
+  if(mode==="col"){h+='<span class="badge">×'+c.qty+'</span><span class="own">'+esc(c.owner)+'</span>';}
+  h+='<b>'+esc(c.name)+'</b><small>'+esc(c.set)+(c.num?" · #"+esc(c.num):"")+'</small>';
+  if(mode==="col")h+='<small>'+esc(c.cond)+(c.foil?" · foil":"")+(c.price?" · "+money(c.price*c.qty):"")+'</small><div class="acts"><button class="btn alt sm" data-a="dec" data-i="'+c.id+'">−</button><button class="btn alt sm" data-a="inc" data-i="'+c.id+'">+</button><button class="btn bad sm" data-a="del" data-i="'+c.id+'">✕</button></div>';
+  if(mode==="res")h+='<div class="acts"><button class="btn good sm" data-a="add" data-i="'+esc(c.cid)+'">+ Add</button><button class="btn alt sm" data-a="wish" data-i="'+esc(c.cid)+'">♡</button></div>';
+  if(mode==="wish")h+=(c.price?'<small>~'+money(c.price)+'</small>':'')+'<div class="acts"><button class="btn good sm" data-a="got" data-i="'+c.id+'">Got it</button><button class="btn bad sm" data-a="wdel" data-i="'+c.id+'">✕</button></div>';
+  return h+"</div>";
+}
+function viewCol(){
+  var f=S.filter,t=f.text.toLowerCase();
+  var list=S.cards.filter(function(c){return (f.owner==="All"||c.owner===f.owner)&&(!t||(c.name+" "+c.set+" "+c.rarity+" "+c.types).toLowerCase().indexOf(t)>-1);});
+  list.sort(function(a,b){
+    if(f.sort==="name")return a.name.localeCompare(b.name);
+    if(f.sort==="value")return (b.price*b.qty)-(a.price*a.qty);
+    if(f.sort==="set")return (a.set+a.num).localeCompare(b.set+b.num,undefined,{numeric:true});
+    return b.added-a.added;
+  });
+  var h='<div class="row"><input type="search" id="ft" placeholder="Filter by name, set, type…" value="'+esc(f.text)+'"><select id="fo">'+["All"].concat(OWNERS).map(function(o){return '<option'+(o===f.owner?" selected":"")+'>'+o+'</option>';}).join("")+'</select><select id="fs">'+[["added","Newest"],["name","Name"],["set","Set"],["value","Value"]].map(function(o){return '<option value="'+o[0]+'"'+(o[0]===f.sort?" selected":"")+'>'+o[1]+'</option>';}).join("")+'</select></div>';
+  if(!S.cards.length)return h+'<div class="msg">Your binder is empty.<br>Open <b>Find &amp; Add</b> to search for your first card.</div>';
+  if(!list.length)return h+'<div class="msg">No matches.</div>';
+  return h+'<div class="grid">'+list.map(function(c){return cardTile(c,"col");}).join("")+"</div>";
+}
+function viewAdd(){
+  var h='<div class="row"><input type="search" id="qn" placeholder="Name (Charizard) or number (4/102)" value="'+esc(S.q.name)+'"><input type="search" id="qs" placeholder="Set name (optional)" value="'+esc(S.q.set)+'"><button class="btn" id="go">Search</button></div>'+
+   '<div class="row"><button class="btn alt sm" id="man">Add manually (no search)</button></div><div class="note" style="margin-bottom:10px">'+esc(S.status)+'</div>';
+  if(S.res.length)h+='<div class="grid">'+S.res.map(function(c){return cardTile(snap(c),"res");}).join("")+"</div>";
+  return h;
+}
+function viewWish(){
+  if(!S.wish.length)return '<div class="msg">No wishlist yet. Tap ♡ on a search result.</div>';
+  var tot=S.wish.reduce(function(a,c){return a+(c.price||0);},0);
+  return '<div class="note" style="margin-bottom:10px">Estimated cost to complete: '+money(tot)+'</div><div class="grid">'+S.wish.map(function(c){return cardTile(c,"wish");}).join("")+"</div>";
+}
+function tally(key){
+  var m={};S.cards.forEach(function(c){var k=(typeof key==="function"?key(c):c[key])||"Unknown";m[k]=(m[k]||0)+c.qty;});
+  return Object.keys(m).map(function(k){return [k,m[k]];}).sort(function(a,b){return b[1]-a[1];});
+}
+function bars(rows){
+  var mx=rows.length?rows[0][1]:1;
+  return rows.slice(0,10).map(function(r){return '<div class="bar"><span>'+esc(r[0])+'</span><div style="width:'+Math.max(4,r[1]/mx*55)+'%"></div><span>'+r[1]+'</span></div>';}).join("");
+}
+function viewStats(){
+  if(!S.cards.length)return '<div class="msg">Add some cards to see stats.</div>';
+  var total=S.cards.reduce(function(a,c){return a+c.qty;},0);
+  var uniq=new Set(S.cards.map(function(c){return c.cid;})).size;
+  var val=S.cards.reduce(function(a,c){return a+c.price*c.qty;},0);
+  var top=S.cards.slice().sort(function(a,b){return b.price-a.price;})[0];
+  return '<div class="stats"><div class="stat"><b>'+total+'</b><span>Total cards</span></div><div class="stat"><b>'+uniq+'</b><span>Unique cards</span></div><div class="stat"><b>'+money(val)+'</b><span>Est. value (TCGplayer market)</span></div><div class="stat"><b>'+esc(top.name)+'</b><span>Priciest card ('+money(top.price)+')</span></div></div>'+
+   '<h3>By owner</h3>'+bars(tally("owner"))+'<h3>By set</h3>'+bars(tally("set"))+'<h3>By rarity</h3>'+bars(tally("rarity"))+'<h3>By type</h3>'+bars(tally("types"))+'<h3>By condition</h3>'+bars(tally("cond"))+
+   '<p class="note">Values are rough market estimates from the card database and can be out of date or missing for some cards.</p>';
+}
+function viewData(){
+  return '<h3 style="margin-top:0">Backup</h3><p class="note">Your collection is saved in this browser only. Export a backup now and then, and use it to move to another phone or computer.</p>'+
+   '<div class="row"><button class="btn" id="ej">Export backup (.json)</button><button class="btn alt" id="ec">Export spreadsheet (.csv)</button><label class="btn alt" style="cursor:pointer">Import backup<input id="im" type="file" accept=".json,application/json" hidden></label></div>'+
+   '<h3>Optional: API key</h3><p class="note">The card database works without a key but may be slower. A free key from dev.pokemontcg.io makes it more reliable.</p><div class="row"><input type="text" id="ak" placeholder="API key (optional)" value="'+esc(S.apikey)+'"><button class="btn alt" id="aks">Save key</button></div>';
+}
+
+function render(){
+  Array.prototype.forEach.call($("nav").children,function(b){b.classList.toggle("on",b.dataset.t===S.tab);});
+  var v={col:viewCol,add:viewAdd,wish:viewWish,stats:viewStats,data:viewData}[S.tab]();
+  var keep=document.activeElement&&document.activeElement.id,pos=document.activeElement&&document.activeElement.selectionStart;
+  $("main").innerHTML=v;wire();
+  if(keep&&$(keep)&&/^(ft|qn|qs)$/.test(keep)){var e=$(keep);e.focus();try{e.setSelectionRange(pos,pos);}catch(x){}}
+}
+function findCard(list,id,key){return list.find(function(c){return c[key]===id;});}
+function wire(){
+  var m=$("main");
+  if($("ft"))$("ft").oninput=function(){S.filter.text=this.value;render();};
+  if($("fo"))$("fo").onchange=function(){S.filter.owner=this.value;render();};
+  if($("fs"))$("fs").onchange=function(){S.filter.sort=this.value;render();};
+  if($("qn")){$("qn").oninput=function(){S.q.name=this.value;};$("qs").oninput=function(){S.q.set=this.value;};
+    [$("qn"),$("qs")].forEach(function(e){e.onkeydown=function(ev){if(ev.key==="Enter")search();};});
+    $("go").onclick=search;$("man").onclick=manualForm;}
+  if($("ej"))$("ej").onclick=function(){dl("poke-binder-backup.json",JSON.stringify({cards:S.cards,wish:S.wish},null,1),"application/json");};
+  if($("ec"))$("ec").onclick=function(){
+    var rows=[["Name","Set","Number","Rarity","Qty","Condition","Foil","Owner","Est. value each","Notes"]].concat(S.cards.map(function(c){return [c.name,c.set,c.num,c.rarity,c.qty,c.cond,c.foil?"yes":"",c.owner,c.price||"",c.notes];}));
+    dl("poke-binder.csv",rows.map(function(r){return r.map(function(x){return '"'+String(x==null?"":x).replace(/"/g,'""')+'"';}).join(",");}).join("\n"),"text/csv");};
+  if($("im"))$("im").onchange=function(){
+    var f=this.files[0];if(!f)return;var r=new FileReader();
+    r.onload=function(){try{var d=JSON.parse(r.result);if(!Array.isArray(d.cards))throw 0;S.cards=d.cards;S.wish=d.wish||[];save();toast("Imported "+S.cards.length+" entries");S.tab="col";render();}catch(e){toast("That file isn't a valid backup");}};
+    r.readAsText(f);};
+  if($("aks"))$("aks").onclick=function(){S.apikey=$("ak").value.trim();save();toast("Saved");};
+}
+function dl(name,text,type){
+  var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([text],{type:type}));a.download=name;document.body.appendChild(a);a.click();a.remove();
+}
+
+$("nav").onclick=function(e){var t=e.target.dataset.t;if(t){S.tab=t;render();window.scrollTo(0,0);}};
+$("main").onclick=function(e){
+  var el=e.target.closest("[data-a],[data-z]");if(!el)return;
+  if(el.dataset.z){var all=S.cards.concat(S.wish);var c=findCard(all,el.dataset.z,"id")||S.res.map(snap).find(function(x){return x.cid===el.dataset.z;});if(c)zoom(c);return;}
+  var a=el.dataset.a,i=el.dataset.i,c;
+  if(a==="inc"){c=findCard(S.cards,i,"id");c.qty++;save();render();}
+  else if(a==="dec"){c=findCard(S.cards,i,"id");if(c.qty>1){c.qty--;}else if(confirm("Remove "+c.name+"?")){S.cards=S.cards.filter(function(x){return x.id!==i;});}save();render();}
+  else if(a==="del"){c=findCard(S.cards,i,"id");if(confirm("Remove all copies of "+c.name+"?")){S.cards=S.cards.filter(function(x){return x.id!==i;});save();render();}}
+  else if(a==="add"){c=S.res.map(snap).find(function(x){return x.cid===i;});if(c)openAdd(c,false);}
+  else if(a==="wish"){c=S.res.map(snap).find(function(x){return x.cid===i;});if(c)addWish(c);}
+  else if(a==="got"){c=findCard(S.wish,i,"id");if(c)openAdd(c,false);}
+  else if(a==="wdel"){S.wish=S.wish.filter(function(x){return x.id!==i;});save();render();}
+};
+
+load();render();
+})();
+</script>
+</body>
+</html>
