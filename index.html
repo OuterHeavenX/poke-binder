@@ -139,7 +139,7 @@ svg.spark{width:100%;height:80px;background:var(--card);border:1px solid var(--l
 <script>
 (function(){
 "use strict";
-var VERSION="1.9.4",BUILD="2026-11-09";
+var VERSION="1.9.5",BUILD="2026-11-09";
 var KEY="pokebinder.v1";
 var API="https://api.pokemontcg.io/v2/cards";
 var SETS_API="https://api.pokemontcg.io/v2/sets";
@@ -167,9 +167,10 @@ function today(){var d=new Date();return d.getFullYear()+"-"+("0"+(d.getMonth()+
 
 function price(card){
   var p=card.tcgplayer&&card.tcgplayer.prices;if(!p)return 0;
-  var best=0;Object.keys(p).forEach(function(k){var m=p[k]&&(p[k].market||p[k].mid);if(m&&m>best)best=m;});
+  var best=0;Object.keys(p).forEach(function(k){var m=p[k]&&(p[k].market||p[k].mid||p[k].low||p[k].directLow);if(m&&m>best)best=m;});
   return best;
 }
+function anyPrice(j){var v=price(j);if(v)return v;var cm=j&&j.cardmarket&&j.cardmarket.prices;var e=cm&&(cm.trendPrice||cm.averageSellPrice||cm.lowPrice);return e?Math.round(e*1.08*100)/100:0;}
 function snap(card){
   return {cid:card.id,name:card.name,set:(card.set&&card.set.name)||"",setId:(card.set&&card.set.id)||"",setTotal:(card.set&&(card.set.total||card.set.printedTotal))||0,setPrinted:(card.set&&card.set.printedTotal)||0,
     num:card.number||"",rarity:card.rarity||"",types:(card.types||[]).join("/"),supertype:card.supertype||"",
@@ -216,9 +217,9 @@ function dexSearch(name,num){
 }
 function dexInfo(d){
   var pr={},tp=d.pricing&&d.pricing.tcgplayer,cm=d.pricing&&d.pricing.cardmarket;
-  if(tp)Object.keys(tp).forEach(function(k){var x=tp[k];if(x&&typeof x==="object")pr[k]={low:x.lowPrice,mid:x.midPrice,high:x.highPrice,market:x.marketPrice||x.midPrice};});
+  if(tp)Object.keys(tp).forEach(function(k){var x=tp[k];if(x&&typeof x==="object")pr[k]={low:x.lowPrice,mid:x.midPrice,high:x.highPrice,market:x.marketPrice||x.midPrice||x.lowPrice};});
   var j={id:d.id,hp:d.hp,artist:d.illustrator,flavorText:d.description,nationalPokedexNumbers:d.dexId,subtypes:d.stage?[d.stage]:[],set:{releaseDate:""},tcgplayer:{prices:pr,updatedAt:tp&&tp.updated?String(tp.updated).slice(0,10):""}};
-  if(!Object.keys(pr).length&&cm&&(cm.trend||cm.avg)){j.cardmarket={prices:{trendPrice:cm.trend||cm.avg}};}
+  if(cm&&(cm.trend||cm.avg||cm.low)){j.cardmarket={prices:{trendPrice:cm.trend||cm.avg||cm.low}};}
   return j;
 }
 function fetchInfo(c){
@@ -502,29 +503,53 @@ function manualForm(){
 }
 
 /* ---------- prices ---------- */
+function pool(items,n,fn){var i=0,out=[];function w(){if(i>=items.length)return Promise.resolve();var k=i++;return Promise.resolve().then(function(){return fn(items[k],k);}).catch(function(){}).then(w);}var ws=[];for(var x=0;x<Math.min(n,items.length);x++)ws.push(w());return Promise.all(ws);}
+var dexNameCache={};
+function dexLookupPrice(c){
+  var key=(c.name||"").toLowerCase();
+  var list=dexNameCache[key]||(dexNameCache[key]=fetch(DEX+"/cards?name="+encodeURIComponent(c.name)).then(function(r){return r.ok?r.json():[];}).catch(function(){return [];}));
+  var want=parseInt(c.num,10);
+  return list.then(function(l){
+    var m=(l||[]).filter(function(x){return parseInt(x.localId,10)===want;});
+    if(!m.length)return 0;
+    var pick=m.find(function(x){return String(x.id).toLowerCase().split("-")[0]===String(c.setId||"").toLowerCase();})||m[0];
+    return fetch(DEX+"/cards/"+encodeURIComponent(pick.id)).then(function(r){return r.ok?r.json():null;}).then(function(d){return d?anyPrice(dexInfo(d)):0;});
+  });
+}
 function refreshPrices(quiet){
-  var ids=[],seen={};
-  S.cards.concat(S.wish).forEach(function(c){if(c.cid&&c.cid.indexOf("manual-")!==0&&!seen[c.cid]){seen[c.cid]=1;ids.push(c.cid);}});
-  if(!ids.length){toast("Add some searched cards first");return;}
+  var rep={},ids=[];
+  S.cards.concat(S.wish).forEach(function(c){if(c.cid&&c.cid.indexOf("manual-")!==0&&!rep[c.cid]){rep[c.cid]=c;ids.push(c.cid);}});
+  if(!ids.length){if(!quiet)toast("Add some searched cards first");return Promise.resolve();}
+  try{localStorage.setItem("pokebinder.pt",String(Date.now()));}catch(e){}
+  var map={},st=function(t){S.priceStatus=t;if(!quiet)render();};
+  st("Checking prices 0/"+ids.length+"…");
   var chunks=[];for(var i=0;i<ids.length;i+=20)chunks.push(ids.slice(i,i+20));
-  var got=0,map={};S.priceStatus="Refreshing 0/"+ids.length+"…";if(!quiet)render();
-  chunks.reduce(function(p,ch){
+  return chunks.reduce(function(p,ch){
     return p.then(function(){
       var q=ch.map(function(id){return 'id:"'+id+'"';}).join(" OR ");
-      return apiGet(API+"?q="+encodeURIComponent(q)+"&pageSize=250&select=id,tcgplayer").then(function(j){
-        (j.data||[]).forEach(function(c){map[c.id]=price(c);});got+=ch.length;S.priceStatus="Refreshing "+got+"/"+ids.length+"…";if(!quiet)render();
-      });
+      return apiGet(API+"?q="+encodeURIComponent(q)+"&pageSize=250&select=id,tcgplayer,cardmarket").then(function(j){
+        (j.data||[]).forEach(function(c){var v=anyPrice(c);if(v)map[c.id]=v;});
+      }).catch(function(){}).then(function(){st("Checking prices "+Math.min(ids.length,Object.keys(map).length)+"/"+ids.length+"…");});
     });
   },Promise.resolve()).then(function(){
     var miss=ids.filter(function(id){return !map[id];});
-    return miss.reduce(function(p,id){return p.then(function(){
-      return fetch(DEX+"/cards/"+encodeURIComponent(id)).then(function(r){return r.ok?r.json():null;}).then(function(d){if(d){var v=price(dexInfo(d));if(!v&&d.pricing&&d.pricing.cardmarket)v=0;if(v)map[id]=v;}}).catch(function(){});
-    });},Promise.resolve());
+    return pool(miss,6,function(id){
+      return fetch(DEX+"/cards/"+encodeURIComponent(id)).then(function(r){return r.ok?r.json():null;}).then(function(d){var v=d?anyPrice(dexInfo(d)):0;if(v)map[id]=v;});
+    });
+  }).then(function(){
+    var miss=ids.filter(function(id){return !map[id];});
+    st("Looking up "+miss.length+" more…");
+    return pool(miss,4,function(id){return dexLookupPrice(rep[id]).then(function(v){if(v)map[id]=v;});});
   }).then(function(){
     var now=Date.now(),n=0;
     S.cards.concat(S.wish).forEach(function(c){if(map[c.cid])c.price=map[c.cid];});
-    Object.keys(map).forEach(function(id){if(map[id]){var h=S.hist[id]||(S.hist[id]=[]);h.push([now,map[id]]);if(h.length>60)h.shift();n++;}});
-    recordValue();save();var hits=S.wish.filter(isHit).length;S.priceStatus="Updated "+n+" prices."+(hits?" 🔔 "+hits+" wishlist card"+(hits>1?"s":"")+" at your target price!":"");if(hits&&quiet)toast("🔔 "+hits+" wishlist deal"+(hits>1?"s":""));render();
+    Object.keys(map).forEach(function(id){var h=S.hist[id]||(S.hist[id]=[]);h.push([now,map[id]]);if(h.length>60)h.shift();n++;});
+    recordValue();save();
+    var tot=0,un=0;S.cards.forEach(function(c){tot+=(c.price||0)*c.qty;if(!c.price)un++;});
+    var hits=S.wish.filter(isHit).length;
+    S.priceStatus="Priced "+n+" of "+ids.length+" cards. Total "+money(tot)+(un?" ("+un+" with no listed price)":"")+"."+(hits?" 🔔 "+hits+" wishlist card"+(hits>1?"s":"")+" at your target price!":"");
+    toast("Collection value "+money(tot));
+    render();
   }).catch(function(e){S.priceStatus="Price refresh failed: "+(e&&e.message||e);if(!quiet)render();});
 }
 
@@ -652,8 +677,8 @@ function manage(id){
    '<button class="btn '+(c.trade?'on':'alt')+'" id="mtr">⇄ For trade</button></div>'+
    '<div class="row" style="margin:0"><button class="btn alt" id="mcl">Close</button><button class="btn bad" id="mrm">Remove</button></div></div>';
   if(c.cid&&c.cid.indexOf("manual-")!==0){
-    var show=function(j){var el=$("minfo");if(!el||!d.open)return;el.className="";el.innerHTML=infoHtml(c,j);if(!(j&&price(j))&&$("mpn")&&!c.price)$("mpn").textContent="no market price listed";
-      var np=j&&price(j);if(np){c.price=np;var h=S.hist[c.cid]||(S.hist[c.cid]=[]);var last=h[h.length-1];if(!last||Date.now()-last[0]>3600000){h.push([Date.now(),np]);if(h.length>60)h.shift();}save();
+    var show=function(j){var el=$("minfo");if(!el||!d.open)return;el.className="";el.innerHTML=infoHtml(c,j);if(!(j&&anyPrice(j))&&$("mpn")&&!c.price)$("mpn").textContent="no market price listed";
+      var np=j&&anyPrice(j);if(np){c.price=np;var h=S.hist[c.cid]||(S.hist[c.cid]=[]);var last=h[h.length-1];if(!last||Date.now()-last[0]>3600000){h.push([Date.now(),np]);if(h.length>60)h.shift();}save();
         if($("mpv"))$("mpv").textContent=money(np);if($("mpn"))$("mpn").textContent="current value each"+(c.qty>1?" · "+money(np*c.qty)+" total":"");if($("mspark"))$("mspark").innerHTML=dlgSpark(S.hist[c.cid]);}};
     if(c.info)show(c.info);
     fetchInfo(c).then(function(j){c.info=j;show(j);}).catch(function(e){var el=$("minfo");if(el&&!c.info)el.textContent="Couldn't load live details ("+(e&&e.message||"network")+"). Try again in a moment.";if($("mpn")&&!c.price)$("mpn").textContent="price unavailable right now";});
@@ -911,7 +936,7 @@ function applyStrip(){
   document.documentElement.style.setProperty("--sat",sat+"px");
   document.documentElement.classList.toggle("strip",S.settings.strip!==false&&sat>=24);
 }
-function updHdr(){var el=$("hs");if(!el)return;var n=0,v=0;S.cards.forEach(function(c){n+=c.qty;v+=(c.price||0)*c.qty;});el.innerHTML='<b>'+n+'</b> cards'+(v?' · <b>'+money(v)+'</b>':'');}
+function updHdr(){var el=$("hs");if(!el)return;var n=0,v=0;S.cards.forEach(function(c){n+=c.qty;v+=(c.price||0)*c.qty;});el.innerHTML='<b>'+n+'</b> cards'+' · <b>'+money(v)+'</b>';}
 function render(){applyStrip();updHdr();
   Array.prototype.forEach.call($("nav").children,function(b){b.classList.toggle("on",b.dataset.t===S.tab);});
   var ae=document.activeElement,keep=ae&&ae.id,pos=ae&&ae.selectionStart;
@@ -1045,8 +1070,9 @@ window.addEventListener("resize",fitBinder);window.addEventListener("orientation
 setTimeout(function(){checkUpdate(false);},1500);
 setTimeout(function(){
   if(!S.settings.autoPrices||!(S.cards.length+S.wish.length))return;
-  var last=S.vhist.length?S.vhist[S.vhist.length-1][0]:0;
-  if(Date.now()-last>20*3600*1000)refreshPrices(true);
+  var last=S.vhist.length?S.vhist[S.vhist.length-1][0]:0,tried=+(localStorage.getItem("pokebinder.pt")||0);
+  var zero=S.cards.some(function(c){return !c.price&&c.cid&&c.cid.indexOf("manual-")!==0;});
+  if(Date.now()-last>20*3600*1000||(zero&&Date.now()-tried>30*60*1000))refreshPrices(true);
 },3500);
 })();
 </script>
