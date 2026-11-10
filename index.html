@@ -519,6 +519,29 @@ function cardTile(c,mode,owned){
   if(mode==="wish")h+=(c.price?'<small>~'+money(c.price)+'</small>':'')+'<div class="acts"><button class="btn good sm" data-a="got" data-i="'+c.id+'">Got it</button><button class="btn bad sm" data-a="wdel" data-i="'+c.id+'">✕</button></div>';
   return h+"</div>";
 }
+function binderPages(list){
+  var groups={},order=[];
+  list.forEach(function(c){
+    var key=c.setId||("n:"+(c.set||"Other"));
+    var g=groups[key];if(!g){g=groups[key]={name:c.set||"Other",year:c.year||"9999",nums:{},extra:[]};order.push(g);}
+    var n=/^\d+$/.test(String(c.num||""))?parseInt(c.num,10):0;
+    if(n>0){var e=g.nums[n];if(e){e.qty+=c.qty;e.trade=e.trade||c.trade;}else g.nums[n]={c:c,qty:c.qty,trade:!!c.trade};}
+    else g.extra.push({c:c,qty:c.qty,trade:!!c.trade});
+  });
+  order.sort(function(a,b){return String(a.year).localeCompare(String(b.year))||a.name.localeCompare(b.name);});
+  var pages=[];
+  order.forEach(function(g){
+    var max=0;Object.keys(g.nums).forEach(function(k){if(+k>max)max=+k;});
+    var all=[];for(var i=1;i<=max;i++)all.push(g.nums[i]||null);
+    g.extra.forEach(function(e){all.push(e);});
+    for(var p=0;p<all.length;p+=9){
+      var sl=all.slice(p,p+9);while(sl.length<9)sl.push(null);
+      if(!sl.some(function(x){return x;}))continue;
+      pages.push({name:g.name,slots:sl,range:(p+1)+"–"+Math.min(p+9,max||all.length)});
+    }
+  });
+  return pages.length?pages:[{name:"",slots:[null,null,null,null,null,null,null,null,null],range:""}];
+}
 function viewCol(){
   var f=S.filter,t=f.text.toLowerCase();
   var list=S.cards.filter(function(c){return (f.owner==="All"||c.owner===f.owner)&&(!t||(c.name+" "+c.set+" "+c.rarity+" "+c.types).toLowerCase().indexOf(t)>-1);});
@@ -528,19 +551,19 @@ function viewCol(){
     if(f.sort==="set")return (a.set+a.num).localeCompare(b.set+b.num,undefined,{numeric:true});
     return b.added-a.added;
   });
-  var h='<div class="row"><input type="search" id="ft" placeholder="Filter by name, set, type…" value="'+esc(f.text)+'"><select id="fo">'+["All"].concat(OWNERS).map(function(o){return '<option'+(o===f.owner?" selected":"")+'>'+o+'</option>';}).join("")+'</select><select id="fs">'+[["added","Newest"],["name","Name"],["set","Set"],["value","Value"]].map(function(o){return '<option value="'+o[0]+'"'+(o[0]===f.sort?" selected":"")+'>'+o[1]+'</option>';}).join("")+'</select><button class="btn sm '+(S.view==="binder"?"on":"alt")+'" data-a="vbinder">Binder</button><button class="btn sm '+(S.view==="list"?"on":"alt")+'" data-a="vlist">List</button></div>';
+  var h='<div class="row"><input type="search" id="ft" placeholder="Filter by name, set, type…" value="'+esc(f.text)+'"><select id="fo">'+["All"].concat(OWNERS).map(function(o){return '<option'+(o===f.owner?" selected":"")+'>'+o+'</option>';}).join("")+'</select>'+(S.view==="binder"?"":'<select id="fs">'+[["added","Newest"],["name","Name"],["set","Set"],["value","Value"]].map(function(o){return '<option value="'+o[0]+'"'+(o[0]===f.sort?" selected":"")+'>'+o[1]+'</option>';}).join("")+'</select>')+'<button class="btn sm '+(S.view==="binder"?"on":"alt")+'" data-a="vbinder">Binder</button><button class="btn sm '+(S.view==="list"?"on":"alt")+'" data-a="vlist">List</button></div>';
   if(!S.cards.length)return h+'<div class="msg">Your binder is empty.<br>Open <b>Find &amp; Add</b> to search for your first card.</div>';
   if(!list.length)return h+'<div class="msg">No matches.</div>';
   if(S.view==="binder"){
-    var per=9,pages=Math.max(1,Math.ceil(list.length/per));
-    if(S.page>=pages)S.page=pages-1;if(S.page<0)S.page=0;
-    var slice=list.slice(S.page*per,S.page*per+per),slots="";
-    for(var k=0;k<per;k++){
-      var c=slice[k];
-      slots+=c?'<div class="slot"><span class="sn">'+esc(c.name)+'</span>'+(c.small?'<img loading="lazy" src="'+esc(c.small)+'" alt="'+esc(c.name)+'" data-a="manage" data-i="'+c.id+'">':'')+(c.qty>1?'<span class="qb">×'+c.qty+'</span>':'')+(c.trade?'<span class="tb">⇄</span>':'')+'</div>':'<div class="slot"></div>';
-    }
-    var pager='<div class="pager"><button class="btn alt sm" data-a="pgprev"'+(S.page===0?' disabled':'')+'>‹</button><span class="note">Page '+(S.page+1)+' of '+pages+' · '+list.length+' card'+(list.length===1?'':'s')+'</span><button class="btn alt sm" data-a="pgnext"'+(S.page>=pages-1?' disabled':'')+'>›</button></div>';
-    return h+pager+'<div class="bg">'+slots+'</div>'+pager+'<div class="note" style="text-align:center">Tap a card to manage it</div>';
+    var pages=binderPages(list);
+    if(S.page>=pages.length)S.page=pages.length-1;if(S.page<0)S.page=0;
+    var pg=pages[S.page],slots="";
+    pg.slots.forEach(function(e){
+      var c=e&&e.c;
+      slots+=c?'<div class="slot"><span class="sn">'+esc(c.name)+'</span>'+(c.small?'<img loading="lazy" src="'+esc(c.small)+'" alt="'+esc(c.name)+'" data-a="manage" data-i="'+c.id+'">':'<span class="sn" data-a="manage" data-i="'+c.id+'"></span>')+(e.qty>1?'<span class="qb">×'+e.qty+'</span>':'')+(e.trade?'<span class="tb">⇄</span>':'')+'</div>':'<div class="slot" style="border-style:dashed;opacity:.55"></div>';
+    });
+    var pager='<div class="pager"><button class="btn alt sm" data-a="pgprev"'+(S.page===0?' disabled':'')+'>‹</button><span class="note">Page '+(S.page+1)+' of '+pages.length+' · '+list.length+' card'+(list.length===1?'':'s')+'</span><button class="btn alt sm" data-a="pgnext"'+(S.page>=pages.length-1?' disabled':'')+'>›</button></div>';
+    return h+pager+'<div class="note" style="text-align:center;margin:-4px 0 8px"><b>'+esc(pg.name)+'</b>'+(pg.range?' · #'+pg.range:'')+'</div><div class="bg">'+slots+'</div>'+pager+'<div class="note" style="text-align:center">Cards sit in the slot for their number, like your real binder. Tap one to manage it.</div>';
   }
   return h+'<div class="grid">'+list.map(function(c){return cardTile(c,"col");}).join("")+"</div>";
 }
