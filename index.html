@@ -16,7 +16,8 @@ html[data-theme=light]{--bg:#f2f4fa;--card:#ffffff;--card2:#e8ecf5;--line:#d3dae
 html[data-theme=light] dialog::backdrop{background:#0008}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{margin:0;background:var(--bg);color:var(--text);font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding-bottom:env(safe-area-inset-bottom)}
-header{position:sticky;top:0;z-index:5;background:linear-gradient(180deg,var(--hdr1),var(--hdr2));border-bottom:1px solid var(--line);padding:calc(2px + env(safe-area-inset-top)) 8px 0;display:flex;align-items:center;gap:6px}
+header{position:sticky;top:0;z-index:5;background:linear-gradient(180deg,var(--hdr1),var(--hdr2));border-bottom:1px solid var(--line);padding:calc(2px + env(safe-area-inset-top)) 8px 0;display:flex;flex-wrap:wrap;align-items:center;gap:0 6px}
+.hrow{width:100%;display:flex;align-items:center;gap:8px;padding:4px 2px 2px}.hrow h1{margin:0;font-size:17px;flex:none}.hrow .hs{flex:1;text-align:right;font-size:12px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hrow .hs b{color:var(--text)}
 header nav{flex:1;min-width:0}
 h1{font-size:16px;margin:0 0 2px;display:flex;align-items:center;gap:8px}
 h1 i{width:18px;height:18px;border-radius:50%;background:linear-gradient(180deg,var(--red) 46%,#222 46% 54%,#fff 54%);border:2px solid #222;display:inline-block}
@@ -41,12 +42,16 @@ main.binder{padding:6px 6px 8px}
 .slot.empty[data-a]:active{transform:scale(.96)}
 .slot.empty::before{content:"";position:absolute;inset:0;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cg fill='none' stroke='%2393a0bd' stroke-width='4'%3E%3Ccircle cx='32' cy='32' r='26'/%3E%3Cpath d='M6 32h18M40 32h18'/%3E%3Ccircle cx='32' cy='32' r='8'/%3E%3C/g%3E%3C/svg%3E") center 42%/44% no-repeat;opacity:.32}
 .slot .en{position:absolute;bottom:6px;left:0;right:0;text-align:center;font-size:11px;color:var(--mut);opacity:.6}
-.slot.shine::after{content:"";position:absolute;inset:0;background:linear-gradient(115deg,transparent 35%,rgba(255,255,255,.38) 50%,transparent 65%);background-size:250% 100%;background-position:150% 0;animation:shine 6s ease-in-out infinite;pointer-events:none;mix-blend-mode:screen}
-@keyframes shine{0%,68%{background-position:150% 0}100%{background-position:-50% 0}}
+.slot{overflow:hidden}
+.slot.shine::after{content:"";position:absolute;inset:0;background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.7) 48%,rgba(255,255,255,.15) 54%,transparent 70%);background-size:260% 100%;background-position:150% 0;animation:shine 3.6s ease-in-out infinite;pointer-events:none;mix-blend-mode:overlay}
+.slot.holo::before{content:"";position:absolute;inset:0;z-index:1;background:linear-gradient(120deg,#ff5e9c,#ffd35e,#5effa0,#5ec8ff,#b05eff,#ff5e9c);background-size:300% 300%;animation:holo 5s linear infinite;pointer-events:none;mix-blend-mode:color-dodge;opacity:.28}
+.slot.shine::after{z-index:2}
+@keyframes holo{0%{background-position:0% 50%}100%{background-position:300% 50%}}
+@keyframes shine{0%,40%{background-position:150% 0}100%{background-position:-50% 0}}
 @keyframes inR{from{transform:translateX(36px);opacity:0}to{transform:none;opacity:1}}
 @keyframes inL{from{transform:translateX(-36px);opacity:0}to{transform:none;opacity:1}}
 .bpage.fr{animation:inR .22s ease-out}.bpage.fl{animation:inL .22s ease-out}
-@media (prefers-reduced-motion:reduce){.slot.shine::after,.bpage{animation:none!important}}
+@media (prefers-reduced-motion:reduce){.slot.holo::before,.slot.shine::after,.bpage{animation:none!important}}
 .row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
 input,select,textarea{background:var(--card);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:10px 12px;font:inherit;min-width:0}
 input[type=text],input[type=search],input[type=number],input[type=date]{flex:1 1 140px}
@@ -103,6 +108,7 @@ svg.spark{width:100%;height:80px;background:var(--card);border:1px solid var(--l
 </head>
 <body>
 <header>
+  <div class="hrow"><h1><i></i>Poké Binder</h1><span class="hs" id="hs"></span><small id="ver" style="flex:none;font-size:11px;color:var(--mut);cursor:pointer"></small></div>
   <nav id="nav">
     <button data-t="col" class="on">Collection</button>
     <button data-t="add">Find &amp; Add</button>
@@ -113,7 +119,6 @@ svg.spark{width:100%;height:80px;background:var(--card);border:1px solid var(--l
     <button data-t="stats">Stats</button>
     <button data-t="data">Settings</button>
   </nav>
-  <small id="ver" style="flex:none;font-size:11px;color:var(--mut);cursor:pointer;padding:0 2px"></small>
 </header>
 <main id="main"></main>
 <dialog id="dlg"></dialog>
@@ -121,7 +126,7 @@ svg.spark{width:100%;height:80px;background:var(--card);border:1px solid var(--l
 <script>
 (function(){
 "use strict";
-var VERSION="1.6.2",BUILD="2026-11-09";
+var VERSION="1.7.0",BUILD="2026-11-09";
 var KEY="pokebinder.v1";
 var API="https://api.pokemontcg.io/v2/cards";
 var SETS_API="https://api.pokemontcg.io/v2/sets";
@@ -577,15 +582,46 @@ async function shareBinder(){
   },"image/png");
 }
 
+function dlgSpark(h){
+  if(!h||h.length<2)return "";
+  var v=h.map(function(x){return x[1];}),mn=Math.min.apply(null,v),mx=Math.max.apply(null,v),W=200,H=34;
+  var pts=v.map(function(y,i){return (i/(v.length-1)*W).toFixed(1)+","+(mx===mn?H/2:H-3-(y-mn)/(mx-mn)*(H-6)).toFixed(1);}).join(" ");
+  return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:34px"><polyline fill="none" stroke="var(--grn)" stroke-width="2" points="'+pts+'"/></svg>';
+}
+function infoHtml(c,j){
+  var h="",p=j&&j.tcgplayer&&j.tcgplayer.prices,cm=j&&j.cardmarket&&j.cardmarket.prices;
+  if(p){
+    h+='<table style="width:100%;font-size:12px;border-collapse:collapse;margin-top:6px"><tr style="color:var(--mut);text-align:right"><td style="text-align:left">TCGplayer</td><td>Low</td><td>Mid</td><td>Market</td><td>High</td></tr>';
+    Object.keys(p).forEach(function(k){var x=p[k]||{};h+='<tr style="text-align:right"><td style="text-align:left">'+esc(k.replace(/([A-Z])/g," $1").replace(/^./,function(m){return m.toUpperCase();}))+'</td><td>'+(x.low?money(x.low):"–")+'</td><td>'+(x.mid?money(x.mid):"–")+'</td><td><b>'+(x.market?money(x.market):"–")+'</b></td><td>'+(x.high?money(x.high):"–")+'</td></tr>';});
+    h+='</table>'+(j.tcgplayer.updatedAt?'<div class="note">Prices as of '+esc(j.tcgplayer.updatedAt)+'</div>':'');
+  }else if(cm&&cm.trendPrice)h+='<div class="note">Cardmarket trend €'+cm.trendPrice.toFixed(2)+'</div>';
+  else h+='<div class="note">No price listed for this card.</div>';
+  var bits=[];
+  if(j){if(j.hp)bits.push("HP "+j.hp);if(j.subtypes&&j.subtypes.length)bits.push(j.subtypes.join(", "));if(j.artist)bits.push("Art: "+j.artist);if(j.set&&j.set.releaseDate)bits.push("Released "+j.set.releaseDate);if(j.nationalPokedexNumbers)bits.push("Dex #"+j.nationalPokedexNumbers.join(", "));}
+  if(bits.length)h+='<div class="note" style="margin-top:6px">'+esc(bits.join(" · "))+'</div>';
+  if(j&&j.flavorText)h+='<div class="note" style="font-style:italic;margin-top:4px">'+esc(j.flavorText)+'</div>';
+  if(j&&j.tcgplayer&&j.tcgplayer.url)h+='<div style="margin-top:6px"><a href="'+esc(j.tcgplayer.url)+'" target="_blank" rel="noopener" style="color:var(--acc,#60a5fa)">View on TCGplayer ↗</a></div>';
+  return h;
+}
 function manage(id){
   var c=findCard(S.cards,id,"id");if(!c)return;
   var d=$("dlg");
-  d.innerHTML='<img src="'+esc(c.large||c.small)+'" alt="" onerror="this.style.display=\'none\'">'+
-   '<b style="display:block;margin-top:8px">'+esc(c.name)+'</b><div class="note">'+esc(c.set)+(c.num?' · #'+esc(c.num):'')+(c.rarity?' · '+esc(c.rarity):'')+'</div>'+
-   '<div class="note">'+esc(c.owner)+' · '+esc(c.cond)+(c.foil?' · foil':'')+(c.price?' · ~'+money(c.price)+' each':'')+'</div>'+
+  var hist=S.hist[c.cid]||[];
+  d.innerHTML='<div style="max-height:88vh;overflow:auto"><img src="'+esc(c.large||c.small)+'" alt="" onerror="this.style.display=\'none\'" style="max-height:46vh;object-fit:contain">'+
+   '<b style="display:block;margin-top:8px;font-size:17px">'+esc(c.name)+'</b><div class="note">'+esc(c.set)+(c.num?' · #'+esc(c.num)+(c.setPrinted?'/'+c.setPrinted:''):'')+(c.rarity?' · '+esc(c.rarity):'')+(c.types?' · '+esc(c.types):'')+'</div>'+
+   '<div class="note">'+esc(c.owner)+' · '+esc(c.cond)+(c.foil?' · foil':'')+'</div>'+
+   '<div style="display:flex;align-items:baseline;gap:10px;margin:8px 0 0"><span style="font-size:24px;font-weight:700" id="mpv">'+(c.price?money(c.price):'—')+'</span><span class="note" id="mpn">'+(c.price?'current value each'+(c.qty>1?' · '+money(c.price*c.qty)+' total':''):'no price yet')+'</span></div>'+
+   '<div id="mspark">'+dlgSpark(hist)+'</div><div id="minfo" class="note">Loading details…</div>'+
    '<div class="row" style="margin:12px 0 8px"><button class="btn alt" id="mdn">−</button><b style="min-width:60px;text-align:center">×'+c.qty+'</b><button class="btn alt" id="mup">+</button>'+
    '<button class="btn '+(c.trade?'on':'alt')+'" id="mtr">⇄ For trade</button></div>'+
-   '<div class="row" style="margin:0"><button class="btn alt" id="mcl">Close</button><button class="btn bad" id="mrm">Remove</button></div>';
+   '<div class="row" style="margin:0"><button class="btn alt" id="mcl">Close</button><button class="btn bad" id="mrm">Remove</button></div></div>';
+  if(c.cid&&c.cid.indexOf("manual-")!==0){
+    var show=function(j){var el=$("minfo");if(!el||!d.open)return;el.className="";el.innerHTML=infoHtml(c,j);
+      var np=j&&price(j);if(np){c.price=np;var h=S.hist[c.cid]||(S.hist[c.cid]=[]);var last=h[h.length-1];if(!last||Date.now()-last[0]>3600000){h.push([Date.now(),np]);if(h.length>60)h.shift();}save();
+        if($("mpv"))$("mpv").textContent=money(np);if($("mpn"))$("mpn").textContent="current value each"+(c.qty>1?" · "+money(np*c.qty)+" total":"");if($("mspark"))$("mspark").innerHTML=dlgSpark(S.hist[c.cid]);}};
+    if(c.info)show(c.info);
+    apiGet("https://api.pokemontcg.io/v2/cards/"+encodeURIComponent(c.cid)+"?select=id,name,hp,subtypes,artist,flavorText,nationalPokedexNumbers,set,tcgplayer,cardmarket").then(function(r){var j=r.data||r;c.info=j;show(j);}).catch(function(){var el=$("minfo");if(el&&!c.info)el.textContent="Couldn't load live details (offline or API busy). Showing saved info.";});
+  }else $("minfo").textContent="Manually added card.";
   if(!d.open)d.showModal();
   $("mcl").onclick=function(){d.close();};
   $("mup").onclick=function(){buzz();c.qty++;save();render();manage(id);};
@@ -655,8 +691,8 @@ function viewCol(){
       var c=e&&e.c;
       if(c){
         var ty=String(c.types||"").split("/")[0];if(ty)tc[ty]=(tc[ty]||0)+1;
-        var shine=/holo|double|ultra|illustration|hyper|secret|ace|radiant|amazing|vmax|vstar|\bex\b|shiny/i.test(c.rarity||"");
-        slots+='<div class="slot'+(shine?' shine':'')+'"><span class="sn">'+esc(c.name)+'</span>'+(c.small?'<img loading="lazy" src="'+esc(c.small)+'" alt="'+esc(c.name)+'" data-a="manage" data-i="'+c.id+'">':'<span class="sn" data-a="manage" data-i="'+c.id+'"></span>')+(e.qty>1?'<span class="qb">×'+e.qty+'</span>':'')+(e.trade?'<span class="tb">⇄</span>':'')+'</div>';
+        var rr=c.rarity||"",holo=!!c.foil||/holo|double|ultra|illustration|hyper|secret|ace|radiant|amazing|vmax|vstar|\bex\b|shiny|special|rainbow|gold/i.test(rr),shine=holo||(rr&&!/^(common|uncommon)$/i.test(rr));
+        slots+='<div class="slot'+(shine?' shine':'')+(holo?' holo':'')+'" data-a="manage" data-i="'+c.id+'"><span class="sn">'+esc(c.name)+'</span>'+(c.small?'<img loading="lazy" src="'+esc(c.small)+'" alt="'+esc(c.name)+'" data-a="manage" data-i="'+c.id+'">':'<span class="sn" data-a="manage" data-i="'+c.id+'"></span>')+(e.qty>1?'<span class="qb">×'+e.qty+'</span>':'')+(e.trade?'<span class="tb">⇄</span>':'')+'</div>';
       }else slots+='<div class="slot empty"'+(pg.nums[idx]&&pg.setId?' data-a="blank" data-set="'+esc(pg.setId)+'" data-n="'+pg.nums[idx]+'"':'')+'>'+(pg.nums[idx]?'<span class="en">#'+pg.nums[idx]+'</span>':'')+'</div>';
     });
     var top=Object.keys(tc).sort(function(a,b){return tc[b]-tc[a];})[0],acc=TYPECOL[top]||"#3b82f6";
@@ -809,7 +845,8 @@ function viewData(){
    '<h3>Danger zone</h3><button class="btn bad" data-a="wipe">Erase everything on this device</button>';
 }
 
-function render(){
+function updHdr(){var el=$("hs");if(!el)return;var n=0,v=0;S.cards.forEach(function(c){n+=c.qty;v+=(c.price||0)*c.qty;});el.innerHTML='<b>'+n+'</b> cards'+(v?' · <b>'+money(v)+'</b>':'');}
+function render(){updHdr();
   Array.prototype.forEach.call($("nav").children,function(b){b.classList.toggle("on",b.dataset.t===S.tab);});
   var ae=document.activeElement,keep=ae&&ae.id,pos=ae&&ae.selectionStart;
   var v=({col:viewCol,add:viewAdd,sets:viewSets,wish:viewWish,trade:viewTrade,packs:viewPacks,stats:viewStats,data:viewData})[S.tab]();
