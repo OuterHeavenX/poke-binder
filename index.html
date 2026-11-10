@@ -11,10 +11,12 @@
 <meta name="theme-color" content="#141828">
 <title>Poké Binder — Collection Tracker</title>
 <style>
-:root{--bg:#10131c;--card:#1a1f2e;--card2:#222939;--line:#2e3650;--text:#eef1f8;--mut:#93a0bd;--red:#ee4b4b;--yel:#ffcb05;--blu:#3b82f6;--grn:#34d399}
+:root{--bg:#10131c;--card:#1a1f2e;--card2:#222939;--line:#2e3650;--text:#eef1f8;--mut:#93a0bd;--red:#ee4b4b;--yel:#ffcb05;--blu:#3b82f6;--grn:#34d399;--hdr1:#1b2033;--hdr2:#141828;--emptybg:rgba(26,31,46,.4);--bannerbg:#3b2f00}
+html[data-theme=light]{--bg:#f2f4fa;--card:#ffffff;--card2:#e8ecf5;--line:#d3dae8;--text:#161a26;--mut:#5b6884;--hdr1:#ffffff;--hdr2:#eef1f8;--emptybg:rgba(210,218,235,.5);--bannerbg:#fff1bd}
+html[data-theme=light] dialog::backdrop{background:#0008}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{margin:0;background:var(--bg);color:var(--text);font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding-bottom:env(safe-area-inset-bottom)}
-header{position:sticky;top:0;z-index:5;background:linear-gradient(180deg,#1b2033,#141828);border-bottom:1px solid var(--line);padding:calc(6px + env(safe-area-inset-top)) 12px 0}
+header{position:sticky;top:0;z-index:5;background:linear-gradient(180deg,var(--hdr1),var(--hdr2));border-bottom:1px solid var(--line);padding:calc(6px + env(safe-area-inset-top)) 12px 0}
 h1{font-size:16px;margin:0 0 2px;display:flex;align-items:center;gap:8px}
 h1 i{width:18px;height:18px;border-radius:50%;background:linear-gradient(180deg,var(--red) 46%,#222 46% 54%,#fff 54%);border:2px solid #222;display:inline-block}
 nav{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
@@ -31,7 +33,9 @@ main.binder{padding:8px 8px 10px}
 .bpage .wm{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:78%;max-height:55%;object-fit:contain;opacity:.12;pointer-events:none}
 .bpage .bg{position:relative;z-index:1}
 .bpage .slot:not(.empty){border:1px solid var(--acc,#3b82f6);box-shadow:0 0 10px -3px var(--acc,#3b82f6)}
-.slot.empty{background:rgba(26,31,46,.4);border-style:dashed}
+.slot.empty{background:var(--emptybg);border-style:dashed}
+.slot.empty[data-a]{cursor:pointer}
+.slot.empty[data-a]:active{transform:scale(.96)}
 .slot.empty::before{content:"";position:absolute;inset:0;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cg fill='none' stroke='%2393a0bd' stroke-width='4'%3E%3Ccircle cx='32' cy='32' r='26'/%3E%3Cpath d='M6 32h18M40 32h18'/%3E%3Ccircle cx='32' cy='32' r='8'/%3E%3C/g%3E%3C/svg%3E") center 42%/44% no-repeat;opacity:.32}
 .slot .en{position:absolute;bottom:6px;left:0;right:0;text-align:center;font-size:11px;color:var(--mut);opacity:.6}
 .slot.shine::after{content:"";position:absolute;inset:0;background:linear-gradient(115deg,transparent 35%,rgba(255,255,255,.38) 50%,transparent 65%);background-size:250% 100%;background-position:150% 0;animation:shine 6s ease-in-out infinite;pointer-events:none;mix-blend-mode:screen}
@@ -58,7 +62,7 @@ button.btn,label.btn{background:var(--blu);color:#fff;border:0;border-radius:10p
 .c b{font-size:13px;line-height:1.2}
 .c small{color:var(--mut);font-size:12px}
 .badge{position:absolute;top:6px;right:6px;background:var(--yel);color:#222;font-weight:800;border-radius:999px;padding:1px 8px;font-size:13px}
-.own{position:absolute;top:6px;left:6px;background:#000a;border-radius:999px;padding:1px 8px;font-size:11px}
+.own{position:absolute;top:6px;left:6px;color:#fff;background:#000a;border-radius:999px;padding:1px 8px;font-size:11px}
 .acts{display:flex;gap:4px;flex-wrap:wrap;align-items:center}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px}
 .stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
@@ -90,7 +94,7 @@ h3{margin:18px 0 6px}
 .slot .tb{position:absolute;top:3px;left:3px;background:#000b;color:var(--yel);border-radius:999px;padding:0 6px;font-size:11px}
 .hd{position:absolute;width:30px;height:30px;margin:-15px 0 0 -15px;border-radius:50%;background:#fff;border:3px solid var(--blu);box-shadow:0 0 0 2px #0008;touch-action:none;cursor:grab}
 .pager{display:flex;align-items:center;justify-content:center;gap:12px;margin:6px 0 10px}
-.banner{background:#3b2f00;border:1px solid var(--yel);border-radius:10px;padding:8px 12px;margin-bottom:12px;display:flex;gap:8px;align-items:center;justify-content:space-between}
+.banner{background:var(--bannerbg);border:1px solid var(--yel);border-radius:10px;padding:8px 12px;margin-bottom:12px;display:flex;gap:8px;align-items:center;justify-content:space-between}
 svg.spark{width:100%;height:80px;background:var(--card);border:1px solid var(--line);border-radius:12px}
 </style>
 </head>
@@ -114,7 +118,7 @@ svg.spark{width:100%;height:80px;background:var(--card);border:1px solid var(--l
 <script>
 (function(){
 "use strict";
-var VERSION="1.5.0",BUILD="2026-11-09";
+var VERSION="1.6.0",BUILD="2026-11-09";
 var KEY="pokebinder.v1";
 var API="https://api.pokemontcg.io/v2/cards";
 var SETS_API="https://api.pokemontcg.io/v2/sets";
@@ -123,7 +127,7 @@ var CONDS=["NM","LP","MP","HP","DMG"];
 var OWNERS=["Me","Wife","Shared"];
 var S={cards:[],wish:[],hist:{},vhist:[],packs:[],tab:"col",res:[],q:{name:"",set:""},status:"",
   filter:{text:"",owner:"All",sort:"added"},apikey:"",sets:[],setsStatus:"",setFilter:"",setView:null,
-  activePack:"",priceStatus:"",batch:null,adjust:null,scanGrid:"1x1",view:"binder",page:0,settings:{layout:"3x3",owner:"Me",cond:"NM"},showFilter:false,latest:"",updStatus:"",flip:""};
+  activePack:"",priceStatus:"",batch:null,adjust:null,scanGrid:"1x1",view:"binder",page:0,settings:{layout:"3x3",owner:"Me",cond:"NM",theme:"auto",haptics:true,autoPrices:true},showFilter:false,latest:"",updStatus:"",flip:"",curPage:null};
 
 function load(){
   try{var d=JSON.parse(localStorage.getItem(KEY)||"{}");
@@ -436,7 +440,7 @@ function openAdd(c,toWish){
   var w=$("aw");if(w)w.onclick=function(){addWish(c);d.close();render();};
   $("ago").onclick=function(){
     if(toWish){addWish(c);}
-    else{addToCollection(c,{qty:Math.max(1,parseInt($("aq").value)||1),cond:$("ac").value,owner:$("ao").value,foil:$("af").value==="1",notes:$("an").value,pack:$("apk")?$("apk").value:""});toast("Added "+c.name);}
+    else{buzz();addToCollection(c,{qty:Math.max(1,parseInt($("aq").value)||1),cond:$("ac").value,owner:$("ao").value,foil:$("af").value==="1",notes:$("an").value,pack:$("apk")?$("apk").value:""});toast("Added "+c.name);}
     d.close();render();
   };
 }
@@ -459,25 +463,25 @@ function manualForm(){
 }
 
 /* ---------- prices ---------- */
-function refreshPrices(){
+function refreshPrices(quiet){
   var ids=[],seen={};
   S.cards.concat(S.wish).forEach(function(c){if(c.cid&&c.cid.indexOf("manual-")!==0&&!seen[c.cid]){seen[c.cid]=1;ids.push(c.cid);}});
   if(!ids.length){toast("Add some searched cards first");return;}
   var chunks=[];for(var i=0;i<ids.length;i+=20)chunks.push(ids.slice(i,i+20));
-  var got=0,map={};S.priceStatus="Refreshing 0/"+ids.length+"…";render();
+  var got=0,map={};S.priceStatus="Refreshing 0/"+ids.length+"…";if(!quiet)render();
   chunks.reduce(function(p,ch){
     return p.then(function(){
       var q=ch.map(function(id){return 'id:"'+id+'"';}).join(" OR ");
       return apiGet(API+"?q="+encodeURIComponent(q)+"&pageSize=250&select=id,tcgplayer").then(function(j){
-        (j.data||[]).forEach(function(c){map[c.id]=price(c);});got+=ch.length;S.priceStatus="Refreshing "+got+"/"+ids.length+"…";render();
+        (j.data||[]).forEach(function(c){map[c.id]=price(c);});got+=ch.length;S.priceStatus="Refreshing "+got+"/"+ids.length+"…";if(!quiet)render();
       });
     });
   },Promise.resolve()).then(function(){
     var now=Date.now(),n=0;
     S.cards.concat(S.wish).forEach(function(c){if(map[c.cid])c.price=map[c.cid];});
     Object.keys(map).forEach(function(id){if(map[id]){var h=S.hist[id]||(S.hist[id]=[]);h.push([now,map[id]]);if(h.length>60)h.shift();n++;}});
-    recordValue();save();S.priceStatus="Updated "+n+" prices.";render();
-  }).catch(function(e){S.priceStatus="Price refresh failed: "+(e&&e.message||e);render();});
+    recordValue();save();var hits=S.wish.filter(isHit).length;S.priceStatus="Updated "+n+" prices."+(hits?" 🔔 "+hits+" wishlist card"+(hits>1?"s":"")+" at your target price!":"");if(hits&&quiet)toast("🔔 "+hits+" wishlist deal"+(hits>1?"s":""));render();
+  }).catch(function(e){S.priceStatus="Price refresh failed: "+(e&&e.message||e);if(!quiet)render();});
 }
 
 /* ---------- sets ---------- */
@@ -508,6 +512,68 @@ function lookup(cid){
   return r?snap(r):null;
 }
 
+function applyTheme(){
+  var t=S.settings.theme||"auto";
+  var light=t==="light"||(t==="auto"&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: light)").matches);
+  document.documentElement.setAttribute("data-theme",light?"light":"dark");
+  var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content",light?"#eef1f8":"#141828");
+}
+function buzz(){
+  if(!S.settings.haptics)return;
+  try{
+    if(navigator.vibrate){navigator.vibrate(12);return;}
+    var l=document.getElementById("hx");
+    if(!l){l=document.createElement("label");l.id="hx";l.setAttribute("aria-hidden","true");l.style.cssText="position:fixed;left:-99px;top:-99px;opacity:0;pointer-events:none";
+      var i=document.createElement("input");i.type="checkbox";i.setAttribute("switch","");l.appendChild(i);document.body.appendChild(l);}
+    l.click();
+  }catch(e){}
+}
+function isHit(c){return c.target>0&&c.price>0&&c.price<=c.target;}
+function lookupBlank(setId,n){
+  var raw=String(parseInt(n,10)),pad=("00"+raw).slice(-3);
+  function byId(num){return apiGet(API+"/"+encodeURIComponent(setId+"-"+num)).then(function(j){if(!j||!j.data)throw new Error("none");return j.data;});}
+  return byId(raw).catch(function(){return byId(pad);}).catch(function(){
+    return apiGet(API+"?q="+encodeURIComponent('set.id:"'+setId+'" number:'+raw)+"&pageSize=3").then(function(j){
+      if(!j.data||!j.data.length)throw new Error("not found");return j.data[0];});
+  });
+}
+function loadImg(url){return new Promise(function(res){if(!url)return res(null);var im=new Image();im.crossOrigin="anonymous";im.onload=function(){res(im);};im.onerror=function(){res(null);};im.src=url;});}
+async function shareBinder(){
+  var P=S.curPage;if(!P){return;}
+  toast("Making your picture…");
+  var c=P.cols,r=P.rows,W=1080,pad=48,gap=22,top=170,foot=96;
+  var cw=Math.floor((W-2*pad-gap*(c-1))/c),ch=Math.round(cw/0.716),H=top+r*ch+gap*(r-1)+foot;
+  var cv=document.createElement("canvas");cv.width=W;cv.height=H;var x=cv.getContext("2d");
+  var g=x.createLinearGradient(0,0,0,H);g.addColorStop(0,"#1b2033");g.addColorStop(1,"#0d1020");x.fillStyle=g;x.fillRect(0,0,W,H);
+  var g2=x.createLinearGradient(0,0,0,H*0.6);g2.addColorStop(0,P.acc+"55");g2.addColorStop(1,P.acc+"00");x.fillStyle=g2;x.fillRect(0,0,W,H);
+  x.fillStyle="#fff";x.font="700 54px system-ui,-apple-system,sans-serif";x.fillText(P.name||"My binder",pad,92);
+  x.fillStyle="#93a0bd";x.font="400 30px system-ui,-apple-system,sans-serif";x.fillText((P.range?"#"+P.range+"  ·  ":"")+"page "+P.page+" of "+P.total,pad,138);
+  var imgs=await Promise.all(P.slots.map(function(e){return e&&e.c?loadImg(e.c.large||e.c.small):Promise.resolve(null);}));
+  P.slots.forEach(function(e,i){
+    var cx=pad+(i%c)*(cw+gap),cy=top+Math.floor(i/c)*(ch+gap);
+    function path(){x.beginPath();if(x.roundRect)x.roundRect(cx,cy,cw,ch,18);else x.rect(cx,cy,cw,ch);}
+    if(e&&e.c){
+      x.save();path();x.clip();
+      if(imgs[i])x.drawImage(imgs[i],cx,cy,cw,ch);
+      else{x.fillStyle="#222939";x.fillRect(cx,cy,cw,ch);x.fillStyle="#eef1f8";x.font="600 30px system-ui,sans-serif";x.textAlign="center";x.fillText(e.c.name,cx+cw/2,cy+ch/2);x.textAlign="left";}
+      x.restore();path();x.strokeStyle=P.acc;x.lineWidth=4;x.stroke();
+      if(e.qty>1){x.fillStyle="#ffcb05";x.beginPath();x.arc(cx+cw-34,cy+34,26,0,Math.PI*2);x.fill();x.fillStyle="#222";x.font="800 26px system-ui,sans-serif";x.textAlign="center";x.fillText("×"+e.qty,cx+cw-34,cy+43);x.textAlign="left";}
+    }else{
+      path();x.fillStyle="rgba(26,31,46,.55)";x.fill();x.setLineDash([12,10]);x.strokeStyle="#2e3650";x.lineWidth=3;x.stroke();x.setLineDash([]);
+      var bx=cx+cw/2,by=cy+ch*0.44,br=cw*0.2;x.strokeStyle="rgba(147,160,189,.5)";x.lineWidth=5;
+      x.beginPath();x.arc(bx,by,br,0,Math.PI*2);x.stroke();x.beginPath();x.moveTo(bx-br,by);x.lineTo(bx-br*0.35,by);x.moveTo(bx+br*0.35,by);x.lineTo(bx+br,by);x.stroke();x.beginPath();x.arc(bx,by,br*0.3,0,Math.PI*2);x.stroke();
+      if(P.nums[i]){x.fillStyle="rgba(147,160,189,.8)";x.font="500 28px system-ui,sans-serif";x.textAlign="center";x.fillText("#"+P.nums[i],bx,cy+ch-30);x.textAlign="left";}
+    }
+  });
+  x.fillStyle="#93a0bd";x.font="500 28px system-ui,sans-serif";x.fillText("Poké Binder",pad,H-40);
+  cv.toBlob(function(blob){
+    if(!blob){toast("Couldn't make the picture");return;}
+    var f=new File([blob],"binder-page.png",{type:"image/png"});
+    if(navigator.canShare&&navigator.canShare({files:[f]})){navigator.share({files:[f],title:P.name||"My binder"}).catch(function(){});}
+    else{var a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="binder-page.png";document.body.appendChild(a);a.click();a.remove();toast("Saved the picture");}
+  },"image/png");
+}
+
 function manage(id){
   var c=findCard(S.cards,id,"id");if(!c)return;
   var d=$("dlg");
@@ -519,8 +585,8 @@ function manage(id){
    '<div class="row" style="margin:0"><button class="btn alt" id="mcl">Close</button><button class="btn bad" id="mrm">Remove</button></div>';
   if(!d.open)d.showModal();
   $("mcl").onclick=function(){d.close();};
-  $("mup").onclick=function(){c.qty++;save();render();manage(id);};
-  $("mdn").onclick=function(){if(c.qty>1){c.qty--;save();render();manage(id);}else if(confirm("Remove "+c.name+"?")){S.cards=S.cards.filter(function(x){return x.id!==id;});save();d.close();render();}};
+  $("mup").onclick=function(){buzz();c.qty++;save();render();manage(id);};
+  $("mdn").onclick=function(){if(c.qty>1){buzz();c.qty--;save();render();manage(id);}else if(confirm("Remove "+c.name+"?")){S.cards=S.cards.filter(function(x){return x.id!==id;});save();d.close();render();}};
   $("mtr").onclick=function(){c.trade=!c.trade;save();render();manage(id);};
   $("mrm").onclick=function(){if(confirm("Remove all copies of "+c.name+"?")){S.cards=S.cards.filter(function(x){return x.id!==id;});save();d.close();render();}};
 }
@@ -532,10 +598,11 @@ function cardTile(c,mode,owned){
   var h='<div class="c'+dim+'">'+img;
   if(mode==="col"){h+='<span class="badge">×'+c.qty+'</span><span class="own">'+esc(c.owner)+'</span>';}
   if(mode==="set"&&owned)h+='<span class="badge">✓ ×'+owned+'</span>';
+  if(mode==="wish"&&isHit(c))h+='<span class="badge" style="background:var(--grn);color:#062b1e">🔔 deal</span>';
   h+='<b>'+esc(c.name)+'</b><small>'+esc(c.set)+(c.num?" · #"+esc(c.num):"")+'</small>';
   if(mode==="col")h+='<small>'+esc(c.cond)+(c.foil?" · foil":"")+(c.price?" · "+money(c.price*c.qty):"")+'</small><div class="acts"><button class="btn alt sm" data-a="dec" data-i="'+c.id+'">−</button><button class="btn alt sm" data-a="inc" data-i="'+c.id+'">+</button><button class="btn sm '+(c.trade?"on":"alt")+'" data-a="trade" data-i="'+c.id+'" title="For trade">⇄</button><button class="btn bad sm" data-a="del" data-i="'+c.id+'">✕</button></div>';
   if(mode==="res"||mode==="set")h+='<div class="acts"><button class="btn good sm" data-a="add" data-i="'+esc(c.cid)+'">+ Add</button><button class="btn alt sm" data-a="wish" data-i="'+esc(c.cid)+'">♡</button></div>';
-  if(mode==="wish")h+=(c.price?'<small>~'+money(c.price)+'</small>':'')+'<div class="acts"><button class="btn good sm" data-a="got" data-i="'+c.id+'">Got it</button><button class="btn bad sm" data-a="wdel" data-i="'+c.id+'">✕</button></div>';
+  if(mode==="wish")h+=(c.price?'<small>~'+money(c.price)+'</small>':'')+'<label class="note" style="display:flex;gap:4px;align-items:center">Alert ≤ $<input type="number" step="0.01" min="0" data-tg="'+c.id+'" value="'+(c.target||"")+'" placeholder="price" style="width:64px;padding:4px 6px;font-size:13px"></label><div class="acts"><button class="btn good sm" data-a="got" data-i="'+c.id+'">Got it</button><button class="btn bad sm" data-a="wdel" data-i="'+c.id+'">✕</button></div>';
   return h+"</div>";
 }
 function binderPages(list,N){
@@ -585,11 +652,12 @@ function viewCol(){
         var ty=String(c.types||"").split("/")[0];if(ty)tc[ty]=(tc[ty]||0)+1;
         var shine=/holo|double|ultra|illustration|hyper|secret|ace|radiant|amazing|vmax|vstar|\bex\b|shiny/i.test(c.rarity||"");
         slots+='<div class="slot'+(shine?' shine':'')+'"><span class="sn">'+esc(c.name)+'</span>'+(c.small?'<img loading="lazy" src="'+esc(c.small)+'" alt="'+esc(c.name)+'" data-a="manage" data-i="'+c.id+'">':'<span class="sn" data-a="manage" data-i="'+c.id+'"></span>')+(e.qty>1?'<span class="qb">×'+e.qty+'</span>':'')+(e.trade?'<span class="tb">⇄</span>':'')+'</div>';
-      }else slots+='<div class="slot empty">'+(pg.nums[idx]?'<span class="en">#'+pg.nums[idx]+'</span>':'')+'</div>';
+      }else slots+='<div class="slot empty"'+(pg.nums[idx]&&pg.setId?' data-a="blank" data-set="'+esc(pg.setId)+'" data-n="'+pg.nums[idx]+'"':'')+'>'+(pg.nums[idx]?'<span class="en">#'+pg.nums[idx]+'</span>':'')+'</div>';
     });
     var top=Object.keys(tc).sort(function(a,b){return tc[b]-tc[a];})[0],acc=TYPECOL[top]||"#3b82f6";
     var fc=S.flip||"";S.flip="";
-    var bar='<div class="tb2"><button class="btn alt sm" data-a="pgprev"'+(S.page===0?' disabled':'')+'>‹</button><div class="ttl"><b>'+esc(pg.name)+'</b>'+(pg.range?' · #'+pg.range:'')+' · '+(S.page+1)+'/'+pages.length+'</div><button class="btn alt sm" data-a="pgnext"'+(S.page>=pages.length-1?' disabled':'')+'>›</button><button class="btn sm '+(S.showFilter?"on":"alt")+'" data-a="tfilter">🔍</button><button class="btn alt sm" data-a="vlist">List</button></div>';
+    S.curPage={name:pg.name,range:pg.range,page:S.page+1,total:pages.length,slots:pg.slots,nums:pg.nums,acc:acc,cols:L.c,rows:L.r};
+    var bar='<div class="tb2"><button class="btn alt sm" data-a="pgprev"'+(S.page===0?' disabled':'')+'>‹</button><div class="ttl"><b>'+esc(pg.name)+'</b>'+(pg.range?' · #'+pg.range:'')+' · '+(S.page+1)+'/'+pages.length+'</div><button class="btn alt sm" data-a="pgnext"'+(S.page>=pages.length-1?' disabled':'')+'>›</button><button class="btn sm '+(S.showFilter?"on":"alt")+'" data-a="tfilter">🔍</button><button class="btn alt sm" data-a="sharepg" title="Share this page">📤</button><button class="btn alt sm" data-a="vlist">List</button></div>';
     return bar+(S.showFilter?filterRow(false):"")+'<div class="bpage '+fc+'" style="--acc:'+acc+';--acc-a:'+acc+'2e">'+(pg.setId?'<img class="wm" src="https://images.pokemontcg.io/'+esc(pg.setId)+'/logo.png" alt="" onerror="this.remove()">':'')+'<div class="bg" id="bgrid" data-c="'+L.c+'" data-r="'+L.r+'" style="grid-template-columns:repeat('+L.c+',1fr)">'+slots+'</div></div>';
   }
   list.sort(function(a,b){
@@ -647,8 +715,8 @@ function viewSets(){
 }
 function viewWish(){
   if(!S.wish.length)return '<div class="msg">No wishlist yet. Tap ♡ on a search result.</div>';
-  var tot=S.wish.reduce(function(a,c){return a+(c.price||0);},0);
-  return '<div class="note" style="margin-bottom:10px">Estimated cost to complete: '+money(tot)+'</div><div class="grid">'+S.wish.map(function(c){return cardTile(c,"wish");}).join("")+"</div>";
+  var tot=S.wish.reduce(function(a,c){return a+(c.price||0);},0),hits=S.wish.filter(isHit).length;
+  return (hits?'<div class="banner"><span>🔔 '+hits+' wishlist card'+(hits>1?'s are':' is')+' at or below your target price.</span></div>':'')+'<div class="note" style="margin-bottom:10px">Set an <b>Alert ≤ $</b> price on a card, then <b>Stats → Refresh prices</b> (it also refreshes by itself once a day).<br>Estimated cost to complete: '+money(tot)+'</div><div class="grid">'+S.wish.map(function(c){return cardTile(c,"wish");}).join("")+"</div>";
 }
 function tradeText(){
   var t=S.cards.filter(function(c){return c.trade;}),L=[];
@@ -726,6 +794,7 @@ function viewData(){
   return '<h3 style="margin-top:0">About</h3><div class="li"><div class="g"><b>Poké Binder</b> v'+VERSION+'<div class="note">Build '+BUILD+'</div><div class="note">'+esc(S.updStatus)+'</div></div><div class="acts" style="flex-direction:column;align-items:stretch"><button class="btn sm" data-a="chkupd">Check for updates</button>'+(S.latest&&S.latest!==VERSION?'<button class="btn good sm" data-a="doupdate">Update to v'+esc(S.latest)+'</button>':'')+'</div></div>'+
    '<h3>Binder</h3><div class="f"><label>Pockets per page<select id="setlay">'+opts([["3x3","3 × 3 (9 pockets)"],["4x3","4 × 3 (12 pockets)"],["2x2","2 × 2 (4 pockets)"],["3x4","3 × 4 (12 pockets)"]],st.layout)+'</select></label>'+
    '<div class="two"><label>Default owner<select id="setown">'+opts(OWNERS.map(function(o){return [o,o];}),st.owner)+'</select></label><label>Default condition<select id="setcnd">'+opts(CONDS.map(function(o){return [o,o];}),st.cond)+'</select></label></div></div>'+
+   '<h3>Look &amp; feel</h3><div class="f"><div class="two"><label>Theme<select id="settheme">'+opts([["auto","Match my phone"],["dark","Dark"],["light","Light"]],st.theme)+'</select></label><label>Haptics<select id="sethap">'+opts([["1","On"],["0","Off"]],st.haptics?"1":"0")+'</select></label></div><label>Auto-refresh prices once a day<select id="setauto">'+opts([["1","On"],["0","Off"]],st.autoPrices?"1":"0")+'</select></label></div>'+
    '<h3>Backup</h3><p class="note">Your collection is saved on this device only. Export a backup now and then; it also moves your collection to another phone.</p>'+
    '<div class="row"><button class="btn" id="ej">Export backup (.json)</button><button class="btn alt" id="ec">Export spreadsheet (.csv)</button><label class="btn alt" style="cursor:pointer">Import backup<input id="im" type="file" accept=".json,application/json" hidden></label></div>'+
    '<h3>Card database key (optional)</h3><p class="note">Works without one. A free key from dev.pokemontcg.io can make searches more reliable.</p><div class="row"><input type="text" id="ak" placeholder="API key (optional)" value="'+esc(S.apikey)+'"><button class="btn alt" id="aks">Save key</button></div>'+
@@ -763,12 +832,16 @@ function wire(){
     r.onload=function(){try{var d=JSON.parse(r.result);if(!Array.isArray(d.cards))throw 0;S.cards=d.cards;S.wish=d.wish||[];S.hist=d.hist||{};S.vhist=d.vhist||[];S.packs=d.packs||[];save();toast("Imported "+S.cards.length+" entries");S.tab="col";render();}catch(e){toast("That file isn't a valid backup");}};
     r.readAsText(f);};
   if($("setlay"))$("setlay").onchange=function(){S.settings.layout=this.value;S.page=0;save();toast("Binder layout saved");};
+  if($("settheme"))$("settheme").onchange=function(){S.settings.theme=this.value;save();applyTheme();};
+  if($("sethap"))$("sethap").onchange=function(){S.settings.haptics=this.value==="1";save();buzz();};
+  if($("setauto"))$("setauto").onchange=function(){S.settings.autoPrices=this.value==="1";save();};
+  Array.prototype.forEach.call(document.querySelectorAll("[data-tg]"),function(e){e.onchange=function(){var w=findCard(S.wish,this.dataset.tg,"id");if(w){w.target=parseFloat(this.value)||0;save();toast(w.target?"Alert set at "+money(w.target):"Alert cleared");render();}};});
   if($("setown"))$("setown").onchange=function(){S.settings.owner=this.value;save();};
   if($("setcnd"))$("setcnd").onchange=function(){S.settings.cond=this.value;save();};
   var bg=$("bgrid");
   if(bg){var x0=null,y0=0;
     bg.ontouchstart=function(e){x0=e.touches[0].clientX;y0=e.touches[0].clientY;};
-    bg.ontouchend=function(e){if(x0==null)return;var dx=e.changedTouches[0].clientX-x0,dy=e.changedTouches[0].clientY-y0;x0=null;if(Math.abs(dx)>60&&Math.abs(dx)>Math.abs(dy)*1.5){S.page+=dx<0?1:-1;S.flip=dx<0?"fr":"fl";render();}};}
+    bg.ontouchend=function(e){if(x0==null)return;var dx=e.changedTouches[0].clientX-x0,dy=e.changedTouches[0].clientY-y0;x0=null;if(Math.abs(dx)>60&&Math.abs(dx)>Math.abs(dy)*1.5){buzz();S.page+=dx<0?1:-1;S.flip=dx<0?"fr":"fl";render();}};}
   if($("aks"))$("aks").onclick=function(){S.apikey=$("ak").value.trim();save();toast("Saved");};
 }
 function checkUpdate(manual){
@@ -819,13 +892,18 @@ $("main").onclick=function(e){
   else if(a==="clearpack"){S.activePack="";render();}
   else if(a==="manage"){manage(i);}
   else if(a==="tfilter"){S.showFilter=!S.showFilter;render();}
+  else if(a==="sharepg"){shareBinder();}
+  else if(a==="blank"){
+    var bn=el.dataset.n,bs=el.dataset.set;buzz();toast("Looking up #"+bn+"…");
+    lookupBlank(bs,bn).then(function(card){openAdd(snap(card),false);}).catch(function(){toast("Couldn't find #"+bn+" right now. Try again in a moment.");});
+  }
   else if(a==="chkupd"){checkUpdate(true);}
   else if(a==="doupdate"){doUpdate();}
   else if(a==="wipe"){if(confirm("Erase ALL cards, wishlist, packs and price history on this device?")&&confirm("Really erase everything? Export a backup first if unsure.")){S.cards=[];S.wish=[];S.hist={};S.vhist=[];S.packs=[];S.page=0;save();toast("Erased");render();}}
   else if(a==="vbinder"){S.view="binder";save();render();}
   else if(a==="vlist"){S.view="list";save();render();}
-  else if(a==="pgprev"){S.page--;S.flip="fl";render();window.scrollTo(0,0);}
-  else if(a==="pgnext"){S.page++;S.flip="fr";render();window.scrollTo(0,0);}
+  else if(a==="pgprev"){buzz();S.page--;S.flip="fl";render();window.scrollTo(0,0);}
+  else if(a==="pgnext"){buzz();S.page++;S.flip="fr";render();window.scrollTo(0,0);}
   else if(a==="bclear"){S.batch=null;render();}
   else if(a==="adjcancel"){closeAdjust();render();}
   else if(a==="adjprev"){S.adjust.idx--;render();}
@@ -844,10 +922,16 @@ $("main").onclick=function(e){
   }
 };
 
-load();render();
+load();applyTheme();render();
+if(window.matchMedia)try{window.matchMedia("(prefers-color-scheme: light)").addEventListener("change",applyTheme);}catch(e){}
 $("ver").textContent="v"+VERSION;$("ver").onclick=function(){S.tab="data";render();};
 window.addEventListener("resize",fitBinder);window.addEventListener("orientationchange",function(){setTimeout(fitBinder,200);});
 setTimeout(function(){checkUpdate(false);},1500);
+setTimeout(function(){
+  if(!S.settings.autoPrices||!(S.cards.length+S.wish.length))return;
+  var last=S.vhist.length?S.vhist[S.vhist.length-1][0]:0;
+  if(Date.now()-last>20*3600*1000)refreshPrices(true);
+},3500);
 })();
 </script>
 </body>
