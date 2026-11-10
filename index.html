@@ -7,6 +7,7 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Binder">
 <meta name="theme-color" content="#141828">
 <title>Poké Binder — Collection Tracker</title>
@@ -33,8 +34,8 @@ main.binder{padding:6px 6px 8px}
 .sgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
 .stile{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px;cursor:pointer;display:flex;flex-direction:column;gap:3px;min-width:0}.stile:active{transform:scale(.97)}
 .stile b{font-size:14px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-.stile .slogo{height:44px;display:flex;align-items:center;justify-content:center;position:relative}.stile .slogo img{max-height:44px;max-width:100%;width:auto;object-fit:contain;border-radius:0}
-.stile .slogo i{width:30px;height:30px;border-radius:50%;background:linear-gradient(180deg,var(--red) 46%,#222 46% 54%,#fff 54%);border:2px solid #222;display:inline-block}.stile .slogo img~i{display:none}
+.stile .slogo{height:64px;display:flex;align-items:center;justify-content:center;position:relative}.stile .fan{position:relative;width:100%;height:100%}.stile .fan img{position:absolute;left:50%;top:0;height:100%;width:auto;max-height:none;border-radius:4px;transform:translateX(calc(-50% + var(--x))) rotate(var(--r));box-shadow:0 2px 6px #0008}.stile .slogo img.lg{max-height:56px;max-width:100%;object-fit:contain}.stile .slogo img{max-height:44px;max-width:100%;width:auto;object-fit:contain;border-radius:0}
+.stile .slogo i{width:30px;height:30px;border-radius:50%;background:linear-gradient(180deg,var(--red) 46%,#222 46% 54%,#fff 54%);border:2px solid #222;display:inline-block}
 .stile.all{border-style:dashed}.stile .track{flex:none;height:6px;margin:2px 0}
 .tb2{display:flex;align-items:center;gap:5px;margin-bottom:5px}
 .tb2 .btn.sm{padding:5px 9px}
@@ -135,7 +136,7 @@ svg.spark{width:100%;height:80px;background:var(--card);border:1px solid var(--l
 <script>
 (function(){
 "use strict";
-var VERSION="1.9.0",BUILD="2026-11-09";
+var VERSION="1.9.1",BUILD="2026-11-09";
 var KEY="pokebinder.v1";
 var API="https://api.pokemontcg.io/v2/cards";
 var SETS_API="https://api.pokemontcg.io/v2/sets";
@@ -705,15 +706,25 @@ function filterRow(withToggle){
    (S.view==="list"?'<select id="fs">'+[["added","Newest"],["name","Name"],["set","Set"],["value","Value"]].map(function(o){return '<option value="'+o[0]+'"'+(o[0]===f.sort?" selected":"")+'>'+o[1]+'</option>';}).join("")+'</select>':"")+
    (withToggle?'<button class="btn sm on" data-a="vlist">List</button><button class="btn sm alt" data-a="vbinder">Binder</button>':"")+'</div>';
 }
+var ART={};try{ART=JSON.parse(localStorage.getItem("pokebinder.art")||"{}")||{};}catch(e){ART={};}
+var artBusy={};
+function fetchArt(key,setId){
+  if(!setId||ART[key]!==undefined||artBusy[key])return;artBusy[key]=1;
+  var done=function(u){ART[key]=u||"";try{localStorage.setItem("pokebinder.art",JSON.stringify(ART));}catch(e){}if(S.tab==="col"&&S.shelf!==false)render();};
+  fetch(DEX+"/sets/"+encodeURIComponent(setId)).then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(d){if(!d.logo)throw 0;done(d.logo+".png");})
+   .catch(function(){return apiGet("https://api.pokemontcg.io/v2/sets/"+encodeURIComponent(setId)).then(function(r){var u=r.data&&r.data.images&&r.data.images.logo;done(u||"");});})
+   .catch(function(){delete artBusy[key];});
+}
 function viewShelf(list){
   var g={},ord=[];
-  list.forEach(function(c){var k=c.setId||("n:"+(c.set||"Other"));var x=g[k];if(!x){x=g[k]={k:k,name:c.set||"Other",setId:c.setId||"",year:c.year||"9999",total:0,nums:{},n:0,qty:0,val:0};ord.push(x);}
+  list.forEach(function(c){var k=c.setId||("n:"+(c.set||"Other"));var x=g[k];if(!x){x=g[k]={k:k,name:c.set||"Other",setId:c.setId||"",year:c.year||"9999",total:0,nums:{},n:0,qty:0,val:0,imgs:[]};ord.push(x);}
+    if(c.small&&x.imgs.length<3&&x.imgs.indexOf(c.small)<0)x.imgs.push(c.small);
     x.total=Math.max(x.total,c.setPrinted||c.setTotal||0);x.qty+=c.qty;x.val+=(c.price||0)*c.qty;var nn=parseInt(c.num,10);if(nn>0)x.nums[nn]=1;else x.n++;});
   ord.sort(function(a,b){return String(a.year).localeCompare(String(b.year))||a.name.localeCompare(b.name);});
   var all=0,tot=0,val=0;
   var tiles=ord.map(function(x){
     var own=Object.keys(x.nums).length+x.n,den=Math.max(x.total,own),pc=den?Math.round(own/den*100):0;all+=own;tot+=den;val+=x.val;
-    return '<div class="stile" data-a="pickset" data-k="'+esc(x.k)+'"><div class="slogo">'+(x.setId?'<img src="https://images.pokemontcg.io/'+esc(x.setId)+'/logo.png" alt="" onerror="this.remove()" onload="if(this.naturalWidth<this.naturalHeight*1.2)this.remove()">':'')+'<i></i></div><b>'+esc(x.name)+'</b><div class="note">'+(x.year!=="9999"?x.year+' · ':'')+own+' / '+den+(pc>=100?' ✓':'')+'</div><div class="track"><div style="width:'+Math.min(100,pc)+'%"></div></div><div class="note">'+(x.val?money(x.val):'')+'</div></div>';
+    return '<div class="stile" data-a="pickset" data-k="'+esc(x.k)+'"><div class="slogo">'+(function(){fetchArt(x.k,x.setId);var u=ART[x.k];if(u)return '<img class="lg" src="'+esc(u)+'" alt="" onerror="this.outerHTML=\'<i></i>\'">';if(!x.imgs.length)return '<i></i>';return '<span class="fan">'+x.imgs.map(function(m,ix){return '<img src="'+esc(m)+'" alt="" style="--r:'+((ix-(x.imgs.length-1)/2)*12)+'deg;--x:'+((ix-(x.imgs.length-1)/2)*26)+'px">';}).join("")+'</span>';})()+'</div><b>'+esc(x.name)+'</b><div class="note">'+(x.year!=="9999"?x.year+' · ':'')+own+' / '+den+(pc>=100?' ✓':'')+'</div><div class="track"><div style="width:'+Math.min(100,pc)+'%"></div></div><div class="note">'+(x.val?money(x.val):'')+'</div></div>';
   }).join("");
   return '<div class="shelf"><div class="shead"><b>Choose a binder</b><span class="note">'+ord.length+' set'+(ord.length===1?'':'s')+' · '+all+(tot?' / '+tot:'')+' cards</span></div><div class="sgrid"><div class="stile all" data-a="pickset" data-k="*"><div class="slogo"><i></i></div><b>All sets</b><div class="note">One long binder</div><div class="note">'+(val?money(val):'')+'</div></div>'+tiles+'</div></div>';
 }
