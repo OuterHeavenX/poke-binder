@@ -139,7 +139,7 @@ svg.spark{width:100%;height:80px;background:var(--card);border:1px solid var(--l
 <script>
 (function(){
 "use strict";
-var VERSION="1.9.2",BUILD="2026-11-09";
+var VERSION="1.9.3",BUILD="2026-11-09";
 var KEY="pokebinder.v1";
 var API="https://api.pokemontcg.io/v2/cards";
 var SETS_API="https://api.pokemontcg.io/v2/sets";
@@ -694,7 +694,7 @@ function binderPages(list,N){
     for(var p=0;p<all.length;p+=N){
       var sl=all.slice(p,p+N);while(sl.length<N)sl.push(null);
       if(!full&&!sl.some(function(x){return x;}))continue;
-      var nm=[];for(var q=0;q<N;q++){var ix=p+q;nm.push(ix<total?("00"+(ix+1)).slice(-3):"");}
+      var nm=[];for(var q=0;q<N;q++){var ix=p+q;nm.push((ix<total||(full&&ix>=all.length))?("00"+(ix+1)).slice(-3):"");}
       pages.push({name:g.name,setId:g.setId,owned:Object.keys(g.nums).length,setSize:Math.max(g.total,max),slots:sl,nums:nm,range:(p+1)+"–"+Math.min(p+N,total||all.length)});
     }
   });
