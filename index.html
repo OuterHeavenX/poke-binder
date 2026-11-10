@@ -17,6 +17,7 @@ html[data-theme=light] dialog::backdrop{background:#0008}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{margin:0;background:var(--bg);color:var(--text);font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding-bottom:env(safe-area-inset-bottom)}
 header{position:sticky;top:0;z-index:5;background:linear-gradient(180deg,var(--hdr1),var(--hdr2));border-bottom:1px solid var(--line);padding:calc(2px + env(safe-area-inset-top)) 8px 0;display:flex;flex-wrap:wrap;align-items:center;gap:0 6px}
+.strip .hrow{position:absolute;top:0;left:10px;width:auto;max-width:70%;height:var(--sat);padding:0;gap:6px}.strip .hrow h1{font-size:15px}.strip .hrow .hs{flex:none;font-size:11px}.strip .hrow #ver{display:none}#ver2{display:none;flex:none;font-size:11px;color:var(--mut);cursor:pointer;padding:0 2px}.strip #ver2{display:inline}
 .hrow{width:100%;display:flex;align-items:center;gap:8px;padding:4px 2px 2px}.hrow h1{margin:0;font-size:17px;flex:none}.hrow .hs{flex:1;text-align:right;font-size:12px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hrow .hs b{color:var(--text)}
 header nav{flex:1;min-width:0}
 h1{font-size:16px;margin:0 0 2px;display:flex;align-items:center;gap:8px}
@@ -119,6 +120,7 @@ svg.spark{width:100%;height:80px;background:var(--card);border:1px solid var(--l
     <button data-t="stats">Stats</button>
     <button data-t="data">Settings</button>
   </nav>
+  <small id="ver2"></small>
 </header>
 <main id="main"></main>
 <dialog id="dlg"></dialog>
@@ -126,7 +128,7 @@ svg.spark{width:100%;height:80px;background:var(--card);border:1px solid var(--l
 <script>
 (function(){
 "use strict";
-var VERSION="1.7.0",BUILD="2026-11-09";
+var VERSION="1.8.0",BUILD="2026-11-09";
 var KEY="pokebinder.v1";
 var API="https://api.pokemontcg.io/v2/cards";
 var SETS_API="https://api.pokemontcg.io/v2/sets";
@@ -200,6 +202,19 @@ function dexSearch(name,num){
       }).catch(function(){return null;});
     }));
   }).then(function(a){return a.filter(Boolean);});
+}
+function dexInfo(d){
+  var pr={},tp=d.pricing&&d.pricing.tcgplayer,cm=d.pricing&&d.pricing.cardmarket;
+  if(tp)Object.keys(tp).forEach(function(k){var x=tp[k];if(x&&typeof x==="object")pr[k]={low:x.lowPrice,mid:x.midPrice,high:x.highPrice,market:x.marketPrice||x.midPrice};});
+  var j={id:d.id,hp:d.hp,artist:d.illustrator,flavorText:d.description,nationalPokedexNumbers:d.dexId,subtypes:d.stage?[d.stage]:[],set:{releaseDate:""},tcgplayer:{prices:pr,updatedAt:tp&&tp.updated?String(tp.updated).slice(0,10):""}};
+  if(!Object.keys(pr).length&&cm&&(cm.trend||cm.avg)){j.cardmarket={prices:{trendPrice:cm.trend||cm.avg}};}
+  return j;
+}
+function fetchInfo(c){
+  var isDex=/tcgdex/i.test(c.small||"");
+  var viaApi=function(){return apiGet("https://api.pokemontcg.io/v2/cards/"+encodeURIComponent(c.cid)+"?select=id,name,hp,subtypes,artist,flavorText,nationalPokedexNumbers,set,tcgplayer,cardmarket").then(function(r){return r.data||r;});};
+  var viaDex=function(){return fetch(DEX+"/cards/"+encodeURIComponent(c.cid)).then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.json();}).then(dexInfo);};
+  return (isDex?viaDex():viaApi()).catch(function(){return isDex?viaApi():viaDex();});
 }
 function buildQuery(n,st){
   n=(n||"").trim();st=(st||"").trim();
@@ -485,6 +500,11 @@ function refreshPrices(quiet){
       });
     });
   },Promise.resolve()).then(function(){
+    var miss=ids.filter(function(id){return !map[id];});
+    return miss.reduce(function(p,id){return p.then(function(){
+      return fetch(DEX+"/cards/"+encodeURIComponent(id)).then(function(r){return r.ok?r.json():null;}).then(function(d){if(d){var v=price(dexInfo(d));if(!v&&d.pricing&&d.pricing.cardmarket)v=0;if(v)map[id]=v;}}).catch(function(){});
+    });},Promise.resolve());
+  }).then(function(){
     var now=Date.now(),n=0;
     S.cards.concat(S.wish).forEach(function(c){if(map[c.cid])c.price=map[c.cid];});
     Object.keys(map).forEach(function(id){if(map[id]){var h=S.hist[id]||(S.hist[id]=[]);h.push([now,map[id]]);if(h.length>60)h.shift();n++;}});
@@ -595,7 +615,7 @@ function infoHtml(c,j){
     Object.keys(p).forEach(function(k){var x=p[k]||{};h+='<tr style="text-align:right"><td style="text-align:left">'+esc(k.replace(/([A-Z])/g," $1").replace(/^./,function(m){return m.toUpperCase();}))+'</td><td>'+(x.low?money(x.low):"–")+'</td><td>'+(x.mid?money(x.mid):"–")+'</td><td><b>'+(x.market?money(x.market):"–")+'</b></td><td>'+(x.high?money(x.high):"–")+'</td></tr>';});
     h+='</table>'+(j.tcgplayer.updatedAt?'<div class="note">Prices as of '+esc(j.tcgplayer.updatedAt)+'</div>':'');
   }else if(cm&&cm.trendPrice)h+='<div class="note">Cardmarket trend €'+cm.trendPrice.toFixed(2)+'</div>';
-  else h+='<div class="note">No price listed for this card.</div>';
+  else h+='<div class="note">No market price is listed for this card yet.</div>';
   var bits=[];
   if(j){if(j.hp)bits.push("HP "+j.hp);if(j.subtypes&&j.subtypes.length)bits.push(j.subtypes.join(", "));if(j.artist)bits.push("Art: "+j.artist);if(j.set&&j.set.releaseDate)bits.push("Released "+j.set.releaseDate);if(j.nationalPokedexNumbers)bits.push("Dex #"+j.nationalPokedexNumbers.join(", "));}
   if(bits.length)h+='<div class="note" style="margin-top:6px">'+esc(bits.join(" · "))+'</div>';
@@ -610,17 +630,17 @@ function manage(id){
   d.innerHTML='<div style="max-height:88vh;overflow:auto"><img src="'+esc(c.large||c.small)+'" alt="" onerror="this.style.display=\'none\'" style="max-height:46vh;object-fit:contain">'+
    '<b style="display:block;margin-top:8px;font-size:17px">'+esc(c.name)+'</b><div class="note">'+esc(c.set)+(c.num?' · #'+esc(c.num)+(c.setPrinted?'/'+c.setPrinted:''):'')+(c.rarity?' · '+esc(c.rarity):'')+(c.types?' · '+esc(c.types):'')+'</div>'+
    '<div class="note">'+esc(c.owner)+' · '+esc(c.cond)+(c.foil?' · foil':'')+'</div>'+
-   '<div style="display:flex;align-items:baseline;gap:10px;margin:8px 0 0"><span style="font-size:24px;font-weight:700" id="mpv">'+(c.price?money(c.price):'—')+'</span><span class="note" id="mpn">'+(c.price?'current value each'+(c.qty>1?' · '+money(c.price*c.qty)+' total':''):'no price yet')+'</span></div>'+
+   '<div style="display:flex;align-items:baseline;gap:10px;margin:8px 0 0"><span style="font-size:24px;font-weight:700" id="mpv">'+(c.price?money(c.price):'—')+'</span><span class="note" id="mpn">'+(c.price?'current value each'+(c.qty>1?' · '+money(c.price*c.qty)+' total':''):'checking price…')+'</span></div>'+
    '<div id="mspark">'+dlgSpark(hist)+'</div><div id="minfo" class="note">Loading details…</div>'+
    '<div class="row" style="margin:12px 0 8px"><button class="btn alt" id="mdn">−</button><b style="min-width:60px;text-align:center">×'+c.qty+'</b><button class="btn alt" id="mup">+</button>'+
    '<button class="btn '+(c.trade?'on':'alt')+'" id="mtr">⇄ For trade</button></div>'+
    '<div class="row" style="margin:0"><button class="btn alt" id="mcl">Close</button><button class="btn bad" id="mrm">Remove</button></div></div>';
   if(c.cid&&c.cid.indexOf("manual-")!==0){
-    var show=function(j){var el=$("minfo");if(!el||!d.open)return;el.className="";el.innerHTML=infoHtml(c,j);
+    var show=function(j){var el=$("minfo");if(!el||!d.open)return;el.className="";el.innerHTML=infoHtml(c,j);if(!(j&&price(j))&&$("mpn")&&!c.price)$("mpn").textContent="no market price listed";
       var np=j&&price(j);if(np){c.price=np;var h=S.hist[c.cid]||(S.hist[c.cid]=[]);var last=h[h.length-1];if(!last||Date.now()-last[0]>3600000){h.push([Date.now(),np]);if(h.length>60)h.shift();}save();
         if($("mpv"))$("mpv").textContent=money(np);if($("mpn"))$("mpn").textContent="current value each"+(c.qty>1?" · "+money(np*c.qty)+" total":"");if($("mspark"))$("mspark").innerHTML=dlgSpark(S.hist[c.cid]);}};
     if(c.info)show(c.info);
-    apiGet("https://api.pokemontcg.io/v2/cards/"+encodeURIComponent(c.cid)+"?select=id,name,hp,subtypes,artist,flavorText,nationalPokedexNumbers,set,tcgplayer,cardmarket").then(function(r){var j=r.data||r;c.info=j;show(j);}).catch(function(){var el=$("minfo");if(el&&!c.info)el.textContent="Couldn't load live details (offline or API busy). Showing saved info.";});
+    fetchInfo(c).then(function(j){c.info=j;show(j);}).catch(function(e){var el=$("minfo");if(el&&!c.info)el.textContent="Couldn't load live details ("+(e&&e.message||"network")+"). Try again in a moment.";if($("mpn")&&!c.price)$("mpn").textContent="price unavailable right now";});
   }else $("minfo").textContent="Manually added card.";
   if(!d.open)d.showModal();
   $("mcl").onclick=function(){d.close();};
@@ -838,15 +858,21 @@ function viewData(){
   return '<h3 style="margin-top:0">About</h3><div class="li"><div class="g"><b>Poké Binder</b> v'+VERSION+'<div class="note">Build '+BUILD+'</div><div class="note">'+esc(S.updStatus)+'</div></div><div class="acts" style="flex-direction:column;align-items:stretch"><button class="btn sm" data-a="chkupd">Check for updates</button>'+(S.latest&&S.latest!==VERSION?'<button class="btn good sm" data-a="doupdate">Update to v'+esc(S.latest)+'</button>':'')+'</div></div>'+
    '<h3>Binder</h3><div class="f"><label>Pockets per page<select id="setlay">'+opts([["3x3","3 × 3 (9 pockets)"],["4x3","4 × 3 (12 pockets)"],["2x2","2 × 2 (4 pockets)"],["3x4","3 × 4 (12 pockets)"]],st.layout)+'</select></label>'+
    '<div class="two"><label>Default owner<select id="setown">'+opts(OWNERS.map(function(o){return [o,o];}),st.owner)+'</select></label><label>Default condition<select id="setcnd">'+opts(CONDS.map(function(o){return [o,o];}),st.cond)+'</select></label></div></div>'+
-   '<h3>Look &amp; feel</h3><div class="f"><div class="two"><label>Theme<select id="settheme">'+opts([["auto","Match my phone"],["dark","Dark"],["light","Light"]],st.theme)+'</select></label><label>Haptics<select id="sethap">'+opts([["1","On"],["0","Off"]],st.haptics?"1":"0")+'</select></label></div><label>Show every pocket of a set (so you can tap any blank)<select id="setfull">'+opts([["1","On"],["0","Off (only up to my last card)"]],st.fullSets!==false?"1":"0")+'</select></label><label>Auto-refresh prices once a day<select id="setauto">'+opts([["1","On"],["0","Off"]],st.autoPrices?"1":"0")+'</select></label></div>'+
+   '<h3>Look &amp; feel</h3><div class="f"><div class="two"><label>Theme<select id="settheme">'+opts([["auto","Match my phone"],["dark","Dark"],["light","Light"]],st.theme)+'</select></label><label>Haptics<select id="sethap">'+opts([["1","On"],["0","Off"]],st.haptics?"1":"0")+'</select></label></div><label>Show every pocket of a set (so you can tap any blank)<select id="setfull">'+opts([["1","On"],["0","Off (only up to my last card)"]],st.fullSets!==false?"1":"0")+'</select></label><label>Title in the phone\'s status-bar strip (turn off if it covers your clock)<select id="setstrip">'+opts([["1","On"],["0","Off"]],st.strip!==false?"1":"0")+'</select></label><label>Auto-refresh prices once a day<select id="setauto">'+opts([["1","On"],["0","Off"]],st.autoPrices?"1":"0")+'</select></label></div>'+
    '<h3>Backup</h3><p class="note">Your collection is saved on this device only. Export a backup now and then; it also moves your collection to another phone.</p>'+
    '<div class="row"><button class="btn" id="ej">Export backup (.json)</button><button class="btn alt" id="ec">Export spreadsheet (.csv)</button><label class="btn alt" style="cursor:pointer">Import backup<input id="im" type="file" accept=".json,application/json" hidden></label></div>'+
    '<h3>Card database key (optional)</h3><p class="note">Works without one. A free key from dev.pokemontcg.io can make searches more reliable.</p><div class="row"><input type="text" id="ak" placeholder="API key (optional)" value="'+esc(S.apikey)+'"><button class="btn alt" id="aks">Save key</button></div>'+
    '<h3>Danger zone</h3><button class="btn bad" data-a="wipe">Erase everything on this device</button>';
 }
 
+function applyStrip(){
+  var p=document.createElement("div");p.style.cssText="position:fixed;top:0;visibility:hidden;padding-top:env(safe-area-inset-top)";document.body.appendChild(p);
+  var sat=p.offsetHeight;document.body.removeChild(p);
+  document.documentElement.style.setProperty("--sat",sat+"px");
+  document.documentElement.classList.toggle("strip",S.settings.strip!==false&&sat>=24);
+}
 function updHdr(){var el=$("hs");if(!el)return;var n=0,v=0;S.cards.forEach(function(c){n+=c.qty;v+=(c.price||0)*c.qty;});el.innerHTML='<b>'+n+'</b> cards'+(v?' · <b>'+money(v)+'</b>':'');}
-function render(){updHdr();
+function render(){applyStrip();updHdr();
   Array.prototype.forEach.call($("nav").children,function(b){b.classList.toggle("on",b.dataset.t===S.tab);});
   var ae=document.activeElement,keep=ae&&ae.id,pos=ae&&ae.selectionStart;
   var v=({col:viewCol,add:viewAdd,sets:viewSets,wish:viewWish,trade:viewTrade,packs:viewPacks,stats:viewStats,data:viewData})[S.tab]();
@@ -879,6 +905,7 @@ function wire(){
   if($("setlay"))$("setlay").onchange=function(){S.settings.layout=this.value;S.page=0;save();toast("Binder layout saved");};
   if($("settheme"))$("settheme").onchange=function(){S.settings.theme=this.value;save();applyTheme();};
   if($("sethap"))$("sethap").onchange=function(){S.settings.haptics=this.value==="1";save();buzz();};
+  if($("setstrip"))$("setstrip").onchange=function(){S.settings.strip=this.value==="1";save();applyStrip();};
   if($("setfull"))$("setfull").onchange=function(){S.settings.fullSets=this.value==="1";S.page=0;save();};
   if($("setauto"))$("setauto").onchange=function(){S.settings.autoPrices=this.value==="1";save();};
   Array.prototype.forEach.call(document.querySelectorAll("[data-tg]"),function(e){e.onchange=function(){var w=findCard(S.wish,this.dataset.tg,"id");if(w){w.target=parseFloat(this.value)||0;save();toast(w.target?"Alert set at "+money(w.target):"Alert cleared");render();}};});
@@ -971,7 +998,7 @@ $("main").onclick=function(e){
 
 load();applyTheme();render();
 if(window.matchMedia)try{window.matchMedia("(prefers-color-scheme: light)").addEventListener("change",applyTheme);}catch(e){}
-$("ver").textContent="v"+VERSION;$("ver").onclick=function(){S.tab="data";render();};
+$("ver").textContent="v"+VERSION;$("ver2").textContent="v"+VERSION;$("ver2").onclick=function(){S.tab="data";render();};$("ver").onclick=function(){S.tab="data";render();};
 window.addEventListener("resize",fitBinder);window.addEventListener("orientationchange",function(){setTimeout(fitBinder,200);});
 setTimeout(function(){checkUpdate(false);},1500);
 setTimeout(function(){
