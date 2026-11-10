@@ -139,7 +139,7 @@ svg.spark{width:100%;height:80px;background:var(--card);border:1px solid var(--l
 <script>
 (function(){
 "use strict";
-var VERSION="1.9.3",BUILD="2026-11-09";
+var VERSION="1.9.4",BUILD="2026-11-09";
 var KEY="pokebinder.v1";
 var API="https://api.pokemontcg.io/v2/cards";
 var SETS_API="https://api.pokemontcg.io/v2/sets";
@@ -248,10 +248,16 @@ function buildQuery(n,st){
 function findCards(n,st,onStatus){
   var b=buildQuery(n,st);
   if(!b.parts.length)return Promise.reject(new Error("nothing to search for"));
-  var url=API+"?q="+encodeURIComponent(b.parts.join(" "))+"&pageSize=36&select=id,name,number,rarity,images,set,tcgplayer,types,supertype";
+  var url=API+"?q="+encodeURIComponent(b.parts.join(" "))+"&pageSize=60&orderBy=-set.releaseDate&select=id,name,number,rarity,images,set,tcgplayer,types,supertype";
   return apiGet(url,function(k){if(onStatus)onStatus("Card database is busy, retrying ("+k+"/2)…");}).then(function(j){
     var cards=(j.data||[]).sort(function(a,b){return String(b.set&&b.set.releaseDate||"").localeCompare(String(a.set&&a.set.releaseDate||""));});
-    return {cards:cards,src:"main"};
+    if(!b.plainName)return {cards:cards,src:"main"};
+    var slow=new Promise(function(res){setTimeout(function(){res([]);},9000);});
+    return Promise.race([dexSearch(b.plainName,b.num).catch(function(){return [];}),slow]).then(function(extra){
+      var seen={};cards.forEach(function(c){seen[((c.set&&c.set.name)||"").toLowerCase()+"|"+parseInt(c.number,10)]=1;});
+      var add=extra.filter(function(c){var k=((c.set&&c.set.name)||"").toLowerCase()+"|"+parseInt(c.number,10);if(seen[k])return false;seen[k]=1;return true;});
+      return {cards:add.concat(cards),src:"main"};
+    });
   }).catch(function(e){
     if(!b.plainName)throw e;
     if(onStatus)onStatus("Main card database is down ("+(e&&e.message||e)+"). Trying the backup…");
