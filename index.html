@@ -126,11 +126,41 @@ function snap(card){
 }
 
 /* ---------- network ---------- */
-function apiGet(url){
+function apiGet(url,onRetry){
   var opts=S.apikey?{headers:{"X-Api-Key":S.apikey}}:undefined;
-  var t=new Promise(function(_,rej){setTimeout(function(){rej(new Error("timed out (the card database is slow, try again)"));},30000);});
-  var f=fetch(url,opts).then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.json();});
-  return Promise.race([f,t]);
+  function once(){
+    var t=new Promise(function(_,rej){setTimeout(function(){rej(new Error("timed out"));},20000);});
+    var f=fetch(url,opts).then(function(r){if(!r.ok){var e=new Error("HTTP "+r.status);e.status=r.status;throw e;}return r.json();});
+    return Promise.race([f,t]);
+  }
+  function go(n){
+    return once().catch(function(e){
+      var retryable=e.message==="timed out"||(e.status>=500)||e.status===429||!e.status;
+      if(n>=3||!retryable)throw e;
+      if(onRetry)onRetry(n);
+      return new Promise(function(r){setTimeout(r,1200*n);}).then(function(){return go(n+1);});
+    });
+  }
+  return go(1);
+}
+var DEX="https://api.tcgdex.net/v2/en";
+function dexSearch(name,num){
+  if(!name)return Promise.reject(new Error("backup needs a card name"));
+  return fetch(DEX+"/cards?name="+encodeURIComponent(name)).then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.json();}).then(function(list){
+    if(num)list=list.filter(function(c){return String(parseInt(c.localId,10))===String(num);});
+    list=list.filter(function(c){return c.image;}).slice(0,12);
+    return Promise.all(list.map(function(b){
+      return fetch(DEX+"/cards/"+encodeURIComponent(b.id)).then(function(r){return r.json();}).then(function(d){
+        var prices={},tp=d.pricing&&d.pricing.tcgplayer;
+        if(tp)Object.keys(tp).forEach(function(k){if(tp[k]&&typeof tp[k]==="object"&&tp[k].marketPrice)prices[k]={market:tp[k].marketPrice};});
+        var cc=d.set&&d.set.cardCount||{};
+        return {id:d.id,name:d.name,number:d.localId,rarity:d.rarity||"",types:d.types||[],supertype:d.category||"",
+          images:{small:d.image?d.image+"/low.webp":"",large:d.image?d.image+"/high.webp":""},
+          set:{id:d.set&&d.set.id||"",name:d.set&&d.set.name||"",total:cc.total||cc.official||0,printedTotal:cc.official||cc.total||0,releaseDate:""},
+          tcgplayer:{prices:prices}};
+      }).catch(function(){return null;});
+    }));
+  }).then(function(a){return a.filter(Boolean);});
 }
 function search(){
   var n=S.q.name.trim(),st=S.q.set.trim();
@@ -148,12 +178,22 @@ function search(){
       else parts.push('name:"'+clean+'*"');
     }else parts.push('set.name:"'+clean+'*"');
   });
-  var url=API+"?q="+encodeURIComponent(parts.join(" "))+"&pageSize=36&orderBy=-set.releaseDate";
+  var url=API+"?q="+encodeURIComponent(parts.join(" "))+"&pageSize=36&select=id,name,number,rarity,images,set,tcgplayer,types,supertype";
   S.status="Searching…";S.res=[];render();
-  apiGet(url).then(function(j){
-    S.res=j.data||[];S.status=S.res.length?S.res.length+" result"+(S.res.length>1?"s":"")+" (newest sets first)":"No cards found. Try a shorter name.";render();
+  var plainName=n.replace(numRe,"").replace(/\s+\d+$/,"").trim();
+  var nm=n.match(numRe)||n.match(/\s(\d+)$/);
+  apiGet(url,function(k){S.status="Card database is busy, retrying ("+k+"/2)…";render();}).then(function(j){
+    S.res=(j.data||[]).sort(function(a,b){return String(b.set&&b.set.releaseDate||"").localeCompare(String(a.set&&a.set.releaseDate||""));});
+    S.status=S.res.length?S.res.length+" result"+(S.res.length>1?"s":"")+" (newest sets first)":"No cards found. Try a shorter name.";render();
   }).catch(function(e){
-    S.status="Search failed: "+(e&&e.message||e)+". If this keeps happening, add cards manually.";render();
+    var why=e&&e.message||e;
+    if(!plainName){S.status="The card database is down right now ("+why+"). Try again in a few minutes, or add the card manually.";render();return;}
+    S.status="Main card database is down ("+why+"). Trying the backup…";render();
+    dexSearch(plainName,nm?(nm[1]):"").then(function(r){
+      S.res=r;S.status=r.length?"Showing "+r.length+" result"+(r.length>1?"s":"")+" from the backup database (prices may be missing).":"No cards found in the backup either. Try a shorter name.";render();
+    }).catch(function(e2){
+      S.status="Both card databases failed ("+(e2&&e2.message||e2)+"). Try again in a few minutes, or add the card manually.";render();
+    });
   });
 }
 
