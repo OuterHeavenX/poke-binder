@@ -29,6 +29,13 @@ nav button.on{color:var(--yel);border-color:var(--yel)}
 main{padding:14px;max-width:1100px;margin:0 auto}
 main.binder{padding:6px 6px 8px}
 .bfoot{padding:6px 4px 0}
+.shelf{padding:4px 2px}.shead{display:flex;justify-content:space-between;align-items:baseline;padding:4px 4px 8px}.shead b{font-size:17px}
+.sgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.stile{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px;cursor:pointer;display:flex;flex-direction:column;gap:3px;min-width:0}.stile:active{transform:scale(.97)}
+.stile b{font-size:14px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.stile .slogo{height:44px;display:flex;align-items:center;justify-content:center;position:relative}.stile .slogo img{max-height:44px;max-width:100%;width:auto;object-fit:contain;border-radius:0}
+.stile .slogo i{width:30px;height:30px;border-radius:50%;background:linear-gradient(180deg,var(--red) 46%,#222 46% 54%,#fff 54%);border:2px solid #222;display:inline-block}.stile .slogo img~i{display:none}
+.stile.all{border-style:dashed}.stile .track{flex:none;height:6px;margin:2px 0}
 .tb2{display:flex;align-items:center;gap:5px;margin-bottom:5px}
 .tb2 .btn.sm{padding:5px 9px}
 .tb2 .ttl{flex:1;text-align:center;font-size:13px;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
@@ -128,7 +135,7 @@ svg.spark{width:100%;height:80px;background:var(--card);border:1px solid var(--l
 <script>
 (function(){
 "use strict";
-var VERSION="1.8.0",BUILD="2026-11-09";
+var VERSION="1.9.0",BUILD="2026-11-09";
 var KEY="pokebinder.v1";
 var API="https://api.pokemontcg.io/v2/cards";
 var SETS_API="https://api.pokemontcg.io/v2/sets";
@@ -698,10 +705,24 @@ function filterRow(withToggle){
    (S.view==="list"?'<select id="fs">'+[["added","Newest"],["name","Name"],["set","Set"],["value","Value"]].map(function(o){return '<option value="'+o[0]+'"'+(o[0]===f.sort?" selected":"")+'>'+o[1]+'</option>';}).join("")+'</select>':"")+
    (withToggle?'<button class="btn sm on" data-a="vlist">List</button><button class="btn sm alt" data-a="vbinder">Binder</button>':"")+'</div>';
 }
+function viewShelf(list){
+  var g={},ord=[];
+  list.forEach(function(c){var k=c.setId||("n:"+(c.set||"Other"));var x=g[k];if(!x){x=g[k]={k:k,name:c.set||"Other",setId:c.setId||"",year:c.year||"9999",total:0,nums:{},n:0,qty:0,val:0};ord.push(x);}
+    x.total=Math.max(x.total,c.setPrinted||c.setTotal||0);x.qty+=c.qty;x.val+=(c.price||0)*c.qty;var nn=parseInt(c.num,10);if(nn>0)x.nums[nn]=1;else x.n++;});
+  ord.sort(function(a,b){return String(a.year).localeCompare(String(b.year))||a.name.localeCompare(b.name);});
+  var all=0,tot=0,val=0;
+  var tiles=ord.map(function(x){
+    var own=Object.keys(x.nums).length+x.n,den=Math.max(x.total,own),pc=den?Math.round(own/den*100):0;all+=own;tot+=den;val+=x.val;
+    return '<div class="stile" data-a="pickset" data-k="'+esc(x.k)+'"><div class="slogo">'+(x.setId?'<img src="https://images.pokemontcg.io/'+esc(x.setId)+'/logo.png" alt="" onerror="this.remove()" onload="if(this.naturalWidth<this.naturalHeight*1.2)this.remove()">':'')+'<i></i></div><b>'+esc(x.name)+'</b><div class="note">'+(x.year!=="9999"?x.year+' · ':'')+own+' / '+den+(pc>=100?' ✓':'')+'</div><div class="track"><div style="width:'+Math.min(100,pc)+'%"></div></div><div class="note">'+(x.val?money(x.val):'')+'</div></div>';
+  }).join("");
+  return '<div class="shelf"><div class="shead"><b>Choose a binder</b><span class="note">'+ord.length+' set'+(ord.length===1?'':'s')+' · '+all+(tot?' / '+tot:'')+' cards</span></div><div class="sgrid"><div class="stile all" data-a="pickset" data-k="*"><div class="slogo"><i></i></div><b>All sets</b><div class="note">One long binder</div><div class="note">'+(val?money(val):'')+'</div></div>'+tiles+'</div></div>';
+}
 function viewCol(){
   var f=S.filter,t=f.text.toLowerCase();
   var list=S.cards.filter(function(c){return (f.owner==="All"||c.owner===f.owner)&&(!t||(c.name+" "+c.set+" "+c.rarity+" "+c.types).toLowerCase().indexOf(t)>-1);});
   if(!S.cards.length)return '<div class="msg">Your binder is empty.<br>Open <b>Find &amp; Add</b> to search for your first card.</div>';
+  if(S.view==="binder"&&S.shelf!==false)return viewShelf(list);
+  if(S.view==="binder"&&S.setSel&&S.setSel!=="*"){var _k=S.setSel;list=list.filter(function(c){return (c.setId||("n:"+(c.set||"Other")))===_k;});if(!list.length){S.shelf=true;return viewShelf(S.cards);}}
   if(S.view==="binder"){
     var L=layoutOf(),N=L.c*L.r,pages=binderPages(list,N);
     if(S.page>=pages.length)S.page=pages.length-1;if(S.page<0)S.page=0;
@@ -718,7 +739,7 @@ function viewCol(){
     var top=Object.keys(tc).sort(function(a,b){return tc[b]-tc[a];})[0],acc=TYPECOL[top]||"#3b82f6";
     var fc=S.flip||"";S.flip="";
     S.curPage={name:pg.name,range:pg.range,page:S.page+1,total:pages.length,slots:pg.slots,nums:pg.nums,acc:acc,cols:L.c,rows:L.r};
-    var bar='<div class="tb2"><button class="btn alt sm" data-a="pgprev"'+(S.page===0?' disabled':'')+'>‹</button><div class="ttl"><b>'+esc(pg.name)+'</b>'+(pg.range?' · #'+pg.range:'')+' · '+(S.page+1)+'/'+pages.length+'</div><button class="btn alt sm" data-a="pgnext"'+(S.page>=pages.length-1?' disabled':'')+'>›</button><button class="btn sm '+(S.showFilter?"on":"alt")+'" data-a="tfilter">🔍</button><button class="btn alt sm" data-a="sharepg" title="Share this page">📤</button><button class="btn alt sm" data-a="vlist">List</button></div>';
+    var bar='<div class="tb2"><button class="btn alt sm" data-a="shelf" title="All binders">▦</button><button class="btn alt sm" data-a="pgprev"'+(S.page===0?' disabled':'')+'>‹</button><div class="ttl"><b>'+esc(pg.name)+'</b>'+(pg.range?' · #'+pg.range:'')+' · '+(S.page+1)+'/'+pages.length+'</div><button class="btn alt sm" data-a="pgnext"'+(S.page>=pages.length-1?' disabled':'')+'>›</button><button class="btn sm '+(S.showFilter?"on":"alt")+'" data-a="tfilter">🔍</button><button class="btn alt sm" data-a="sharepg" title="Share this page">📤</button><button class="btn alt sm" data-a="vlist">List</button></div>';
     return bar+(S.showFilter?filterRow(false):"")+'<div class="bpage '+fc+'" style="--acc:'+acc+';--acc-a:'+acc+'2e">'+(pg.setId?'<img class="wm" src="https://images.pokemontcg.io/'+esc(pg.setId)+'/logo.png" alt="" onerror="this.remove()" onload="if(this.naturalWidth<this.naturalHeight*1.2)this.remove()">':'')+'<div class="bg" id="bgrid" data-c="'+L.c+'" data-r="'+L.r+'" style="grid-template-columns:repeat('+L.c+',1fr)">'+slots+'</div></div>'+
       '<div class="bfoot" id="bfoot">'+(pg.setSize?'<div class="bar" style="margin:0 0 4px"><span style="width:auto">'+pg.owned+' / '+pg.setSize+'</span><div class="track"><div style="width:'+Math.min(100,pg.owned/pg.setSize*100)+'%"></div></div><span style="width:auto">'+Math.round(pg.owned/pg.setSize*100)+'%</span></div>':'')+
       (pages.length>1?'<input type="range" id="pgslide" min="0" max="'+(pages.length-1)+'" value="'+S.page+'" style="width:100%;padding:0">':'')+'</div>';
@@ -965,6 +986,8 @@ $("main").onclick=function(e){
   else if(a==="packadd"){S.activePack=i;S.tab="add";render();window.scrollTo(0,0);}
   else if(a==="clearpack"){S.activePack="";render();}
   else if(a==="manage"){manage(i);}
+  else if(a==="pickset"){buzz();S.setSel=el.dataset.k;S.shelf=false;S.page=0;render();}
+  else if(a==="shelf"){buzz();S.shelf=true;render();}
   else if(a==="tfilter"){S.showFilter=!S.showFilter;render();}
   else if(a==="sharepg"){shareBinder();}
   else if(a==="blank"){
