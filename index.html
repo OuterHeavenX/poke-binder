@@ -16,7 +16,8 @@ html[data-theme=light]{--bg:#f2f4fa;--card:#ffffff;--card2:#e8ecf5;--line:#d3dae
 html[data-theme=light] dialog::backdrop{background:#0008}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{margin:0;background:var(--bg);color:var(--text);font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding-bottom:env(safe-area-inset-bottom)}
-header{position:sticky;top:0;z-index:5;background:linear-gradient(180deg,var(--hdr1),var(--hdr2));border-bottom:1px solid var(--line);padding:calc(6px + env(safe-area-inset-top)) 12px 0}
+header{position:sticky;top:0;z-index:5;background:linear-gradient(180deg,var(--hdr1),var(--hdr2));border-bottom:1px solid var(--line);padding:calc(2px + env(safe-area-inset-top)) 8px 0;display:flex;align-items:center;gap:6px}
+header nav{flex:1;min-width:0}
 h1{font-size:16px;margin:0 0 2px;display:flex;align-items:center;gap:8px}
 h1 i{width:18px;height:18px;border-radius:50%;background:linear-gradient(180deg,var(--red) 46%,#222 46% 54%,#fff 54%);border:2px solid #222;display:inline-block}
 nav{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
@@ -24,12 +25,14 @@ nav::-webkit-scrollbar{display:none}
 nav button{flex:0 0 auto;background:none;border:0;color:var(--mut);padding:8px 11px;font:600 14px inherit;border-bottom:3px solid transparent;white-space:nowrap}
 nav button.on{color:var(--yel);border-color:var(--yel)}
 main{padding:14px;max-width:1100px;margin:0 auto}
-main.binder{padding:8px 8px 10px}
-.tb2{display:flex;align-items:center;gap:6px;margin-bottom:8px}
+main.binder{padding:6px 6px 8px}
+.bfoot{padding:6px 4px 0}
+.tb2{display:flex;align-items:center;gap:5px;margin-bottom:5px}
+.tb2 .btn.sm{padding:5px 9px}
 .tb2 .ttl{flex:1;text-align:center;font-size:13px;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 /* binder page juice */
 .bg .slot{aspect-ratio:auto}
-.bpage{position:relative;border-radius:14px;padding:5px;background:linear-gradient(180deg,var(--acc-a,#3b82f626),transparent 72%)}
+.bpage{position:relative;border-radius:14px;padding:3px;background:linear-gradient(180deg,var(--acc-a,#3b82f626),transparent 72%)}
 .bpage .wm{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:78%;max-height:55%;object-fit:contain;opacity:.12;pointer-events:none}
 .bpage .bg{position:relative;z-index:1}
 .bpage .slot:not(.empty){border:1px solid var(--acc,#3b82f6);box-shadow:0 0 10px -3px var(--acc,#3b82f6)}
@@ -100,7 +103,6 @@ svg.spark{width:100%;height:80px;background:var(--card);border:1px solid var(--l
 </head>
 <body>
 <header>
-  <h1><i></i> Poké Binder <small id="ver" style="margin-left:auto;font-weight:400;font-size:11px;color:var(--mut);cursor:pointer"></small></h1>
   <nav id="nav">
     <button data-t="col" class="on">Collection</button>
     <button data-t="add">Find &amp; Add</button>
@@ -111,6 +113,7 @@ svg.spark{width:100%;height:80px;background:var(--card);border:1px solid var(--l
     <button data-t="stats">Stats</button>
     <button data-t="data">Settings</button>
   </nav>
+  <small id="ver" style="flex:none;font-size:11px;color:var(--mut);cursor:pointer;padding:0 2px"></small>
 </header>
 <main id="main"></main>
 <dialog id="dlg"></dialog>
@@ -118,7 +121,7 @@ svg.spark{width:100%;height:80px;background:var(--card);border:1px solid var(--l
 <script>
 (function(){
 "use strict";
-var VERSION="1.6.0",BUILD="2026-11-09";
+var VERSION="1.6.2",BUILD="2026-11-09";
 var KEY="pokebinder.v1";
 var API="https://api.pokemontcg.io/v2/cards";
 var SETS_API="https://api.pokemontcg.io/v2/sets";
@@ -127,7 +130,7 @@ var CONDS=["NM","LP","MP","HP","DMG"];
 var OWNERS=["Me","Wife","Shared"];
 var S={cards:[],wish:[],hist:{},vhist:[],packs:[],tab:"col",res:[],q:{name:"",set:""},status:"",
   filter:{text:"",owner:"All",sort:"added"},apikey:"",sets:[],setsStatus:"",setFilter:"",setView:null,
-  activePack:"",priceStatus:"",batch:null,adjust:null,scanGrid:"1x1",view:"binder",page:0,settings:{layout:"3x3",owner:"Me",cond:"NM",theme:"auto",haptics:true,autoPrices:true},showFilter:false,latest:"",updStatus:"",flip:"",curPage:null};
+  activePack:"",priceStatus:"",batch:null,adjust:null,scanGrid:"1x1",view:"binder",page:0,settings:{layout:"3x3",owner:"Me",cond:"NM",theme:"auto",haptics:true,autoPrices:true,fullSets:true},showFilter:false,latest:"",updStatus:"",flip:"",curPage:null};
 
 function load(){
   try{var d=JSON.parse(localStorage.getItem(KEY)||"{}");
@@ -150,7 +153,7 @@ function price(card){
   return best;
 }
 function snap(card){
-  return {cid:card.id,name:card.name,set:(card.set&&card.set.name)||"",setId:(card.set&&card.set.id)||"",setTotal:(card.set&&(card.set.total||card.set.printedTotal))||0,
+  return {cid:card.id,name:card.name,set:(card.set&&card.set.name)||"",setId:(card.set&&card.set.id)||"",setTotal:(card.set&&(card.set.total||card.set.printedTotal))||0,setPrinted:(card.set&&card.set.printedTotal)||0,
     num:card.number||"",rarity:card.rarity||"",types:(card.types||[]).join("/"),supertype:card.supertype||"",
     small:(card.images&&card.images.small)||"",large:(card.images&&card.images.large)||"",price:price(card),
     year:(card.set&&card.set.releaseDate||"").slice(0,4)};
@@ -606,10 +609,11 @@ function cardTile(c,mode,owned){
   return h+"</div>";
 }
 function binderPages(list,N){
-  var groups={},order=[];
+  var groups={},order=[],full=S.settings.fullSets!==false;
   list.forEach(function(c){
     var key=c.setId||("n:"+(c.set||"Other"));
-    var g=groups[key];if(!g){g=groups[key]={name:c.set||"Other",setId:c.setId||"",year:c.year||"9999",nums:{},extra:[]};order.push(g);}
+    var g=groups[key];if(!g){g=groups[key]={name:c.set||"Other",setId:c.setId||"",year:c.year||"9999",total:0,nums:{},extra:[]};order.push(g);}
+    g.total=Math.max(g.total,c.setPrinted||c.setTotal||0);
     var n=/^\d+$/.test(String(c.num||""))?parseInt(c.num,10):0;
     if(n>0){var e=g.nums[n];if(e){e.qty+=c.qty;e.trade=e.trade||c.trade;}else g.nums[n]={c:c,qty:c.qty,trade:!!c.trade};}
     else g.extra.push({c:c,qty:c.qty,trade:!!c.trade});
@@ -618,13 +622,14 @@ function binderPages(list,N){
   var pages=[];
   order.forEach(function(g){
     var max=0;Object.keys(g.nums).forEach(function(k){if(+k>max)max=+k;});
-    var all=[];for(var i=1;i<=max;i++)all.push(g.nums[i]||null);
+    var total=full?Math.max(max,g.total):max;
+    var all=[];for(var i=1;i<=total;i++)all.push(g.nums[i]||null);
     g.extra.forEach(function(e){all.push(e);});
     for(var p=0;p<all.length;p+=N){
       var sl=all.slice(p,p+N);while(sl.length<N)sl.push(null);
-      if(!sl.some(function(x){return x;}))continue;
-      var nm=[];for(var q=0;q<N;q++){var ix=p+q;nm.push(ix<max?("00"+(ix+1)).slice(-3):"");}
-      pages.push({name:g.name,setId:g.setId,slots:sl,nums:nm,range:(p+1)+"–"+Math.min(p+N,max||all.length)});
+      if(!full&&!sl.some(function(x){return x;}))continue;
+      var nm=[];for(var q=0;q<N;q++){var ix=p+q;nm.push(ix<total?("00"+(ix+1)).slice(-3):"");}
+      pages.push({name:g.name,setId:g.setId,owned:Object.keys(g.nums).length,setSize:Math.max(g.total,max),slots:sl,nums:nm,range:(p+1)+"–"+Math.min(p+N,total||all.length)});
     }
   });
   if(!pages.length){var e=[];for(var z=0;z<N;z++)e.push(null);pages.push({name:"",setId:"",slots:e,nums:e.map(function(){return "";}),range:""});}
@@ -658,7 +663,9 @@ function viewCol(){
     var fc=S.flip||"";S.flip="";
     S.curPage={name:pg.name,range:pg.range,page:S.page+1,total:pages.length,slots:pg.slots,nums:pg.nums,acc:acc,cols:L.c,rows:L.r};
     var bar='<div class="tb2"><button class="btn alt sm" data-a="pgprev"'+(S.page===0?' disabled':'')+'>‹</button><div class="ttl"><b>'+esc(pg.name)+'</b>'+(pg.range?' · #'+pg.range:'')+' · '+(S.page+1)+'/'+pages.length+'</div><button class="btn alt sm" data-a="pgnext"'+(S.page>=pages.length-1?' disabled':'')+'>›</button><button class="btn sm '+(S.showFilter?"on":"alt")+'" data-a="tfilter">🔍</button><button class="btn alt sm" data-a="sharepg" title="Share this page">📤</button><button class="btn alt sm" data-a="vlist">List</button></div>';
-    return bar+(S.showFilter?filterRow(false):"")+'<div class="bpage '+fc+'" style="--acc:'+acc+';--acc-a:'+acc+'2e">'+(pg.setId?'<img class="wm" src="https://images.pokemontcg.io/'+esc(pg.setId)+'/logo.png" alt="" onerror="this.remove()">':'')+'<div class="bg" id="bgrid" data-c="'+L.c+'" data-r="'+L.r+'" style="grid-template-columns:repeat('+L.c+',1fr)">'+slots+'</div></div>';
+    return bar+(S.showFilter?filterRow(false):"")+'<div class="bpage '+fc+'" style="--acc:'+acc+';--acc-a:'+acc+'2e">'+(pg.setId?'<img class="wm" src="https://images.pokemontcg.io/'+esc(pg.setId)+'/logo.png" alt="" onerror="this.remove()" onload="if(this.naturalWidth<this.naturalHeight*1.2)this.remove()">':'')+'<div class="bg" id="bgrid" data-c="'+L.c+'" data-r="'+L.r+'" style="grid-template-columns:repeat('+L.c+',1fr)">'+slots+'</div></div>'+
+      '<div class="bfoot" id="bfoot">'+(pg.setSize?'<div class="bar" style="margin:0 0 4px"><span style="width:auto">'+pg.owned+' / '+pg.setSize+'</span><div class="track"><div style="width:'+Math.min(100,pg.owned/pg.setSize*100)+'%"></div></div><span style="width:auto">'+Math.round(pg.owned/pg.setSize*100)+'%</span></div>':'')+
+      (pages.length>1?'<input type="range" id="pgslide" min="0" max="'+(pages.length-1)+'" value="'+S.page+'" style="width:100%;padding:0">':'')+'</div>';
   }
   list.sort(function(a,b){
     if(f.sort==="name")return a.name.localeCompare(b.name);
@@ -674,7 +681,8 @@ function fitBinder(){
   var g=$("bgrid");if(!g)return;
   var c=+g.dataset.c,r=+g.dataset.r,gap=6,ratio=245/342;
   var top=g.getBoundingClientRect().top+(window.pageYOffset||0);
-  var avail=(window.innerHeight||600)-top-16;
+  var sb=parseFloat(getComputedStyle(document.body).paddingBottom)||0;
+  var ft=$("bfoot");var avail=(window.innerHeight||600)-top-10-sb-(ft?ft.offsetHeight+6:0);
   var wW=(g.clientWidth-gap*(c-1))/c,wH=((avail-gap*(r-1))/r)*ratio;
   var w=Math.floor(Math.max(48,Math.min(wW,wH))),h=Math.round(w/ratio);
   g.style.gridTemplateColumns="repeat("+c+","+w+"px)";g.style.gridAutoRows=h+"px";g.style.justifyContent="center";
@@ -794,7 +802,7 @@ function viewData(){
   return '<h3 style="margin-top:0">About</h3><div class="li"><div class="g"><b>Poké Binder</b> v'+VERSION+'<div class="note">Build '+BUILD+'</div><div class="note">'+esc(S.updStatus)+'</div></div><div class="acts" style="flex-direction:column;align-items:stretch"><button class="btn sm" data-a="chkupd">Check for updates</button>'+(S.latest&&S.latest!==VERSION?'<button class="btn good sm" data-a="doupdate">Update to v'+esc(S.latest)+'</button>':'')+'</div></div>'+
    '<h3>Binder</h3><div class="f"><label>Pockets per page<select id="setlay">'+opts([["3x3","3 × 3 (9 pockets)"],["4x3","4 × 3 (12 pockets)"],["2x2","2 × 2 (4 pockets)"],["3x4","3 × 4 (12 pockets)"]],st.layout)+'</select></label>'+
    '<div class="two"><label>Default owner<select id="setown">'+opts(OWNERS.map(function(o){return [o,o];}),st.owner)+'</select></label><label>Default condition<select id="setcnd">'+opts(CONDS.map(function(o){return [o,o];}),st.cond)+'</select></label></div></div>'+
-   '<h3>Look &amp; feel</h3><div class="f"><div class="two"><label>Theme<select id="settheme">'+opts([["auto","Match my phone"],["dark","Dark"],["light","Light"]],st.theme)+'</select></label><label>Haptics<select id="sethap">'+opts([["1","On"],["0","Off"]],st.haptics?"1":"0")+'</select></label></div><label>Auto-refresh prices once a day<select id="setauto">'+opts([["1","On"],["0","Off"]],st.autoPrices?"1":"0")+'</select></label></div>'+
+   '<h3>Look &amp; feel</h3><div class="f"><div class="two"><label>Theme<select id="settheme">'+opts([["auto","Match my phone"],["dark","Dark"],["light","Light"]],st.theme)+'</select></label><label>Haptics<select id="sethap">'+opts([["1","On"],["0","Off"]],st.haptics?"1":"0")+'</select></label></div><label>Show every pocket of a set (so you can tap any blank)<select id="setfull">'+opts([["1","On"],["0","Off (only up to my last card)"]],st.fullSets!==false?"1":"0")+'</select></label><label>Auto-refresh prices once a day<select id="setauto">'+opts([["1","On"],["0","Off"]],st.autoPrices?"1":"0")+'</select></label></div>'+
    '<h3>Backup</h3><p class="note">Your collection is saved on this device only. Export a backup now and then; it also moves your collection to another phone.</p>'+
    '<div class="row"><button class="btn" id="ej">Export backup (.json)</button><button class="btn alt" id="ec">Export spreadsheet (.csv)</button><label class="btn alt" style="cursor:pointer">Import backup<input id="im" type="file" accept=".json,application/json" hidden></label></div>'+
    '<h3>Card database key (optional)</h3><p class="note">Works without one. A free key from dev.pokemontcg.io can make searches more reliable.</p><div class="row"><input type="text" id="ak" placeholder="API key (optional)" value="'+esc(S.apikey)+'"><button class="btn alt" id="aks">Save key</button></div>'+
@@ -834,10 +842,12 @@ function wire(){
   if($("setlay"))$("setlay").onchange=function(){S.settings.layout=this.value;S.page=0;save();toast("Binder layout saved");};
   if($("settheme"))$("settheme").onchange=function(){S.settings.theme=this.value;save();applyTheme();};
   if($("sethap"))$("sethap").onchange=function(){S.settings.haptics=this.value==="1";save();buzz();};
+  if($("setfull"))$("setfull").onchange=function(){S.settings.fullSets=this.value==="1";S.page=0;save();};
   if($("setauto"))$("setauto").onchange=function(){S.settings.autoPrices=this.value==="1";save();};
   Array.prototype.forEach.call(document.querySelectorAll("[data-tg]"),function(e){e.onchange=function(){var w=findCard(S.wish,this.dataset.tg,"id");if(w){w.target=parseFloat(this.value)||0;save();toast(w.target?"Alert set at "+money(w.target):"Alert cleared");render();}};});
   if($("setown"))$("setown").onchange=function(){S.settings.owner=this.value;save();};
   if($("setcnd"))$("setcnd").onchange=function(){S.settings.cond=this.value;save();};
+  if($("pgslide")){$("pgslide").onchange=function(){S.page=+this.value;buzz();render();};}
   var bg=$("bgrid");
   if(bg){var x0=null,y0=0;
     bg.ontouchstart=function(e){x0=e.touches[0].clientX;y0=e.touches[0].clientY;};
