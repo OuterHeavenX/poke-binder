@@ -19,7 +19,7 @@ html[data-theme=light] dialog::backdrop{background:#0008}
 body{margin:0;background:var(--bg);color:var(--text);font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding-bottom:env(safe-area-inset-bottom)}
 header{position:sticky;top:0;z-index:5;background:linear-gradient(180deg,var(--hdr1),var(--hdr2));border-bottom:1px solid var(--line);padding:calc(2px + env(safe-area-inset-top)) 8px 0;display:flex;flex-wrap:wrap;align-items:center;gap:0 6px}
 .strip .hrow{position:absolute;top:0;left:10px;width:auto;max-width:70%;height:var(--sat);padding:0;gap:6px}.strip .hrow h1{font-size:15px}.strip .hrow .hs{flex:none;font-size:11px}.strip .hrow #ver{display:none}#ver2{display:none;flex:none;font-size:11px;color:var(--mut);cursor:pointer;padding:0 2px}.strip #ver2{display:inline}
-.hrow{width:100%;display:flex;align-items:center;gap:8px;padding:4px 2px 2px}.hrow h1{margin:0;font-size:17px;flex:none}.hrow .hs{flex:1;text-align:right;font-size:12px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hrow .hs b{color:var(--text)}
+.hrow{width:100%;display:flex;align-items:center;gap:8px;padding:4px 2px 2px}.hrow h1{margin:0;font-size:17px;flex:none}.hrow .hs{text-decoration:underline dotted;text-underline-offset:3px;flex:1;text-align:right;font-size:12px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hrow .hs b{color:var(--text)}
 header nav{flex:1;min-width:0}
 h1{font-size:16px;margin:0 0 2px;display:flex;align-items:center;gap:8px}
 h1 i{width:18px;height:18px;border-radius:50%;background:linear-gradient(180deg,var(--red) 46%,#222 46% 54%,#fff 54%);border:2px solid #222;display:inline-block}
@@ -139,7 +139,7 @@ svg.spark{width:100%;height:80px;background:var(--card);border:1px solid var(--l
 <script>
 (function(){
 "use strict";
-var VERSION="1.9.5",BUILD="2026-11-09";
+var VERSION="1.10.0",BUILD="2026-11-09";
 var KEY="pokebinder.v1";
 var API="https://api.pokemontcg.io/v2/cards";
 var SETS_API="https://api.pokemontcg.io/v2/sets";
@@ -936,6 +936,27 @@ function applyStrip(){
   document.documentElement.style.setProperty("--sat",sat+"px");
   document.documentElement.classList.toggle("strip",S.settings.strip!==false&&sat>=24);
 }
+function valueList(scope){
+  var d=$("dlg"),setKey=(S.view==="binder"&&S.shelf===false&&S.setSel&&S.setSel!=="*")?S.setSel:"";
+  if(scope===undefined)scope=setKey?"set":"all";
+  var keyOf=function(c){return c.setId||("n:"+(c.set||"Other"));};
+  var rows=S.cards.filter(function(c){return scope==="all"||!setKey||keyOf(c)===setKey;}).map(function(c){return {c:c,t:(c.price||0)*c.qty};}).sort(function(a,b){return b.t-a.t;});
+  var tot=0,un=0;rows.forEach(function(r){tot+=r.t;if(!r.c.price)un++;});
+  var h='<div style="max-height:86vh;overflow:auto"><div style="display:flex;justify-content:space-between;align-items:baseline"><b style="font-size:17px">Most valuable</b><span style="font-size:20px;font-weight:700">'+money(tot)+'</span></div>';
+  if(setKey)h+='<div class="row" style="margin:8px 0"><button class="btn '+(scope==="set"?"on":"alt")+' sm" id="vs1">This set</button><button class="btn '+(scope==="all"?"on":"alt")+' sm" id="vs2">Everything</button></div>';
+  h+='<div class="note" style="margin:4px 0 6px">'+rows.length+' card'+(rows.length===1?'':'s')+(un?' · '+un+' with no price':'')+' · tap one for details</div>';
+  rows.slice(0,150).forEach(function(r,i){
+    var c=r.c,pct=tot?Math.round(r.t/tot*100):0;
+    h+='<div class="vrow" data-vid="'+c.id+'" style="display:flex;gap:10px;align-items:center;padding:6px 0;border-top:1px solid var(--line);cursor:pointer"><span class="note" style="width:18px;text-align:right">'+(i+1)+'</span>'+(c.small?'<img src="'+esc(c.small)+'" alt="" style="width:34px;border-radius:3px;flex:none">':'<span style="width:34px"></span>')+
+     '<div style="flex:1;min-width:0"><b style="display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:14px">'+esc(c.name)+'</b><div class="note" style="overflow:hidden;white-space:nowrap;text-overflow:ellipsis">'+esc(c.set)+(c.num?' · #'+esc(c.num):'')+(c.rarity?' · '+esc(c.rarity):'')+(c.qty>1?' · ×'+c.qty:'')+'</div></div>'+
+     '<div style="text-align:right"><b>'+(c.price?money(r.t):'—')+'</b><div class="note">'+(c.price?pct+'%':'no price')+'</div></div></div>';
+  });
+  h+='</div><div class="row" style="margin:10px 0 0"><button class="btn alt" id="vcl">Close</button></div>';
+  d.innerHTML=h;if(!d.open)d.showModal();
+  $("vcl").onclick=function(){d.close();};
+  if($("vs1"))$("vs1").onclick=function(){valueList("set");};if($("vs2"))$("vs2").onclick=function(){valueList("all");};
+  Array.prototype.forEach.call(d.querySelectorAll(".vrow"),function(el){el.onclick=function(){manage(el.dataset.vid);};});
+}
 function updHdr(){var el=$("hs");if(!el)return;var n=0,v=0;S.cards.forEach(function(c){n+=c.qty;v+=(c.price||0)*c.qty;});el.innerHTML='<b>'+n+'</b> cards'+' · <b>'+money(v)+'</b>';}
 function render(){applyStrip();updHdr();
   Array.prototype.forEach.call($("nav").children,function(b){b.classList.toggle("on",b.dataset.t===S.tab);});
@@ -1065,7 +1086,7 @@ $("main").onclick=function(e){
 
 load();applyTheme();render();
 if(window.matchMedia)try{window.matchMedia("(prefers-color-scheme: light)").addEventListener("change",applyTheme);}catch(e){}
-$("ver").textContent="v"+VERSION;$("ver2").textContent="v"+VERSION;$("ver2").onclick=function(){S.tab="data";render();};$("ver").onclick=function(){S.tab="data";render();};
+$("hs").style.cursor="pointer";$("hs").onclick=function(){buzz();valueList();};$("ver").textContent="v"+VERSION;$("ver2").textContent="v"+VERSION;$("ver2").onclick=function(){S.tab="data";render();};$("ver").onclick=function(){S.tab="data";render();};
 window.addEventListener("resize",fitBinder);window.addEventListener("orientationchange",function(){setTimeout(fitBinder,200);});
 setTimeout(function(){checkUpdate(false);},1500);
 setTimeout(function(){
