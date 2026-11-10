@@ -139,7 +139,7 @@ svg.spark{width:100%;height:80px;background:var(--card);border:1px solid var(--l
 <script>
 (function(){
 "use strict";
-var VERSION="1.10.0",BUILD="2026-11-09";
+var VERSION="1.10.1",BUILD="2026-11-09";
 var KEY="pokebinder.v1";
 var API="https://api.pokemontcg.io/v2/cards";
 var SETS_API="https://api.pokemontcg.io/v2/sets";
@@ -165,12 +165,22 @@ function toast(t){var d=document.createElement("div");d.textContent=t;d.style.cs
 function $(id){return document.getElementById(id);}
 function today(){var d=new Date();return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2);}
 
-function price(card){
-  var p=card.tcgplayer&&card.tcgplayer.prices;if(!p)return 0;
-  var best=0;Object.keys(p).forEach(function(k){var m=p[k]&&(p[k].market||p[k].mid||p[k].low||p[k].directLow);if(m&&m>best)best=m;});
-  return best;
+function cls(k){return /reverse/i.test(k)?"rev":/holo/i.test(k)?"holo":"norm";}
+function pick(card,foil){
+  var p=card&&card.tcgplayer&&card.tcgplayer.prices;if(!p)return null;
+  var order=foil?["rev","holo","norm"]:["norm","rev","holo"],byc={};
+  Object.keys(p).forEach(function(k){var x=p[k]||{},v=x.market||x.mid||x.low||x.directLow;if(v&&!byc[cls(k)])byc[cls(k)]={v:v,k:k};});
+  for(var i=0;i<order.length;i++)if(byc[order[i]])return byc[order[i]];
+  return null;
 }
-function anyPrice(j){var v=price(j);if(v)return v;var cm=j&&j.cardmarket&&j.cardmarket.prices;var e=cm&&(cm.trendPrice||cm.averageSellPrice||cm.lowPrice);return e?Math.round(e*1.08*100)/100:0;}
+function price(card,foil){var r=pick(card,foil);return r?r.v:0;}
+function prettyK(k){return String(k).replace(/([A-Z])/g," $1").replace(/[-_]/g," ").replace(/^./,function(m){return m.toUpperCase();});}
+function priceInfo(j,foil,site){
+  var r=pick(j,foil);if(r)return {v:r.v,src:"TCGplayer "+prettyK(r.k).toLowerCase()+" price"+(site?" (via "+site+")":"")};
+  var cm=j&&j.cardmarket&&j.cardmarket.prices,e=cm&&(cm.trendPrice||cm.averageSellPrice||cm.lowPrice);
+  return e?{v:Math.round(e*1.08*100)/100,src:"Cardmarket trend, euros converted (via "+(site||"api")+")"}:null;
+}
+function anyPrice(j,foil){var r=priceInfo(j,foil);return r?r.v:0;}
 function snap(card){
   return {cid:card.id,name:card.name,set:(card.set&&card.set.name)||"",setId:(card.set&&card.set.id)||"",setTotal:(card.set&&(card.set.total||card.set.printedTotal))||0,setPrinted:(card.set&&card.set.printedTotal)||0,
     num:card.number||"",rarity:card.rarity||"",types:(card.types||[]).join("/"),supertype:card.supertype||"",
@@ -224,8 +234,8 @@ function dexInfo(d){
 }
 function fetchInfo(c){
   var isDex=/tcgdex/i.test(c.small||"");
-  var viaApi=function(){return apiGet("https://api.pokemontcg.io/v2/cards/"+encodeURIComponent(c.cid)+"?select=id,name,hp,subtypes,artist,flavorText,nationalPokedexNumbers,set,tcgplayer,cardmarket").then(function(r){return r.data||r;});};
-  var viaDex=function(){return fetch(DEX+"/cards/"+encodeURIComponent(c.cid)).then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.json();}).then(dexInfo);};
+  var viaApi=function(){return apiGet("https://api.pokemontcg.io/v2/cards/"+encodeURIComponent(c.cid)+"?select=id,name,hp,subtypes,artist,flavorText,nationalPokedexNumbers,set,tcgplayer,cardmarket").then(function(r){var j=r.data||r;j._exact=1;j._site="pokemontcg.io";return j;});};
+  var viaDex=function(){return fetch(DEX+"/cards/"+encodeURIComponent(c.cid)).then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.json();}).then(function(d){var j=dexInfo(d);j._exact=1;j._site="TCGdex";return j;});};
   return (isDex?viaDex():viaApi()).catch(function(){return isDex?viaApi():viaDex();});
 }
 function buildQuery(n,st){
@@ -505,15 +515,19 @@ function manualForm(){
 /* ---------- prices ---------- */
 function pool(items,n,fn){var i=0,out=[];function w(){if(i>=items.length)return Promise.resolve();var k=i++;return Promise.resolve().then(function(){return fn(items[k],k);}).catch(function(){}).then(w);}var ws=[];for(var x=0;x<Math.min(n,items.length);x++)ws.push(w());return Promise.all(ws);}
 var dexNameCache={};
-function dexLookupPrice(c){
+function dexLookup(c){
   var key=(c.name||"").toLowerCase();
   var list=dexNameCache[key]||(dexNameCache[key]=fetch(DEX+"/cards?name="+encodeURIComponent(c.name)).then(function(r){return r.ok?r.json():[];}).catch(function(){return [];}));
   var want=parseInt(c.num,10);
   return list.then(function(l){
-    var m=(l||[]).filter(function(x){return parseInt(x.localId,10)===want;});
-    if(!m.length)return 0;
-    var pick=m.find(function(x){return String(x.id).toLowerCase().split("-")[0]===String(c.setId||"").toLowerCase();})||m[0];
-    return fetch(DEX+"/cards/"+encodeURIComponent(pick.id)).then(function(r){return r.ok?r.json():null;}).then(function(d){return d?anyPrice(dexInfo(d)):0;});
+    var m=(l||[]).filter(function(x){return parseInt(x.localId,10)===want;}).slice(0,6);
+    return m.reduce(function(p,x){return p.then(function(found){
+      if(found)return found;
+      return fetch(DEX+"/cards/"+encodeURIComponent(x.id)).then(function(r){return r.ok?r.json():null;}).then(function(d){
+        var sn=((d&&d.set&&d.set.name)||"").toLowerCase();
+        return d&&sn&&sn===String(c.set||"").toLowerCase()?dexInfo(d):null;
+      }).catch(function(){return null;});
+    });},Promise.resolve(null));
   });
 }
 function refreshPrices(quiet){
@@ -528,22 +542,26 @@ function refreshPrices(quiet){
     return p.then(function(){
       var q=ch.map(function(id){return 'id:"'+id+'"';}).join(" OR ");
       return apiGet(API+"?q="+encodeURIComponent(q)+"&pageSize=250&select=id,tcgplayer,cardmarket").then(function(j){
-        (j.data||[]).forEach(function(c){var v=anyPrice(c);if(v)map[c.id]=v;});
-      }).catch(function(){}).then(function(){st("Checking prices "+Math.min(ids.length,Object.keys(map).length)+"/"+ids.length+"…");});
+        (j.data||[]).forEach(function(c){if(priceInfo(c,false))map[c.id]={j:c,site:"pokemontcg.io"};});
+      }).catch(function(){}).then(function(){st("Checking prices "+Object.keys(map).length+"/"+ids.length+"…");});
     });
   },Promise.resolve()).then(function(){
     var miss=ids.filter(function(id){return !map[id];});
     return pool(miss,6,function(id){
-      return fetch(DEX+"/cards/"+encodeURIComponent(id)).then(function(r){return r.ok?r.json():null;}).then(function(d){var v=d?anyPrice(dexInfo(d)):0;if(v)map[id]=v;});
+      return fetch(DEX+"/cards/"+encodeURIComponent(id)).then(function(r){return r.ok?r.json():null;}).then(function(d){if(d){var j=dexInfo(d);if(priceInfo(j,false))map[id]={j:j,site:"TCGdex"};}});
     });
   }).then(function(){
     var miss=ids.filter(function(id){return !map[id];});
     st("Looking up "+miss.length+" more…");
-    return pool(miss,4,function(id){return dexLookupPrice(rep[id]).then(function(v){if(v)map[id]=v;});});
+    return pool(miss,4,function(id){return dexLookup(rep[id]).then(function(j){if(j&&priceInfo(j,false))map[id]={j:j,site:"TCGdex (matched by name, number and set)"};});});
   }).then(function(){
-    var now=Date.now(),n=0;
-    S.cards.concat(S.wish).forEach(function(c){if(map[c.cid])c.price=map[c.cid];});
-    Object.keys(map).forEach(function(id){var h=S.hist[id]||(S.hist[id]=[]);h.push([now,map[id]]);if(h.length>60)h.shift();n++;});
+    var now=Date.now(),n=0,done={};
+    S.cards.concat(S.wish).forEach(function(c){
+      var m=map[c.cid];
+      if(m){var r=priceInfo(m.j,c.foil,m.site);if(r){c.price=r.v;c.psrc=r.src;}}
+      else if(!c.psrc)c.price=0;
+    });
+    ids.forEach(function(id){var m=map[id];if(m){var r=priceInfo(m.j,false,m.site);if(r){var h=S.hist[id]||(S.hist[id]=[]);h.push([now,r.v]);if(h.length>60)h.shift();n++;}}});
     recordValue();save();
     var tot=0,un=0;S.cards.forEach(function(c){tot+=(c.price||0)*c.qty;if(!c.price)un++;});
     var hits=S.wish.filter(isHit).length;
@@ -672,13 +690,14 @@ function manage(id){
    '<b style="display:block;margin-top:8px;font-size:17px">'+esc(c.name)+'</b><div class="note">'+esc(c.set)+(c.num?' · #'+esc(c.num)+(c.setPrinted?'/'+c.setPrinted:''):'')+(c.rarity?' · '+esc(c.rarity):'')+(c.types?' · '+esc(c.types):'')+'</div>'+
    '<div class="note">'+esc(c.owner)+' · '+esc(c.cond)+(c.foil?' · foil':'')+'</div>'+
    '<div style="display:flex;align-items:baseline;gap:10px;margin:8px 0 0"><span style="font-size:24px;font-weight:700" id="mpv">'+(c.price?money(c.price):'—')+'</span><span class="note" id="mpn">'+(c.price?'current value each'+(c.qty>1?' · '+money(c.price*c.qty)+' total':''):'checking price…')+'</span></div>'+
-   '<div id="mspark">'+dlgSpark(hist)+'</div><div id="minfo" class="note">Loading details…</div>'+
+   '<div class="note" id="mpsrc">'+(c.price&&c.psrc?'Source: '+esc(c.psrc):'')+'</div><div id="mspark">'+dlgSpark(hist)+'</div><div id="minfo" class="note">Loading details…</div>'+
    '<div class="row" style="margin:12px 0 8px"><button class="btn alt" id="mdn">−</button><b style="min-width:60px;text-align:center">×'+c.qty+'</b><button class="btn alt" id="mup">+</button>'+
    '<button class="btn '+(c.trade?'on':'alt')+'" id="mtr">⇄ For trade</button></div>'+
    '<div class="row" style="margin:0"><button class="btn alt" id="mcl">Close</button><button class="btn bad" id="mrm">Remove</button></div></div>';
   if(c.cid&&c.cid.indexOf("manual-")!==0){
-    var show=function(j){var el=$("minfo");if(!el||!d.open)return;el.className="";el.innerHTML=infoHtml(c,j);if(!(j&&anyPrice(j))&&$("mpn")&&!c.price)$("mpn").textContent="no market price listed";
-      var np=j&&anyPrice(j);if(np){c.price=np;var h=S.hist[c.cid]||(S.hist[c.cid]=[]);var last=h[h.length-1];if(!last||Date.now()-last[0]>3600000){h.push([Date.now(),np]);if(h.length>60)h.shift();}save();
+    var show=function(j){var el=$("minfo");if(!el||!d.open)return;el.className="";el.innerHTML=infoHtml(c,j);if(!(j&&anyPrice(j,c.foil))&&$("mpn")&&!c.price)$("mpn").textContent="no market price listed";
+      var pi=j&&priceInfo(j,c.foil,j&&j._site||"");var np=pi&&pi.v;if(!np&&j&&j._exact&&c.price){c.price=0;c.psrc="";save();if($("mpv"))$("mpv").textContent="—";if($("mpn"))$("mpn").textContent="no market price listed";if($("mpsrc"))$("mpsrc").textContent="";}
+      if(np){c.price=np;c.psrc=pi.src;if($("mpsrc"))$("mpsrc").textContent="Source: "+pi.src;var h=S.hist[c.cid]||(S.hist[c.cid]=[]);var last=h[h.length-1];if(!last||Date.now()-last[0]>3600000){h.push([Date.now(),np]);if(h.length>60)h.shift();}save();
         if($("mpv"))$("mpv").textContent=money(np);if($("mpn"))$("mpn").textContent="current value each"+(c.qty>1?" · "+money(np*c.qty)+" total":"");if($("mspark"))$("mspark").innerHTML=dlgSpark(S.hist[c.cid]);}};
     if(c.info)show(c.info);
     fetchInfo(c).then(function(j){c.info=j;show(j);}).catch(function(e){var el=$("minfo");if(el&&!c.info)el.textContent="Couldn't load live details ("+(e&&e.message||"network")+"). Try again in a moment.";if($("mpn")&&!c.price)$("mpn").textContent="price unavailable right now";});
