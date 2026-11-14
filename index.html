@@ -29,7 +29,7 @@ nav button{flex:0 0 auto;background:none;border:0;color:var(--mut);padding:8px 1
 nav button.on{color:var(--yel);border-color:var(--yel)}
 main{padding:14px;max-width:1100px;margin:0 auto}
 main.binder{padding:6px 6px 8px}
-.bfoot{padding:6px 4px 0}
+.bfoot{padding:6px 4px 0}.bnote{margin:0 0 4px;color:#f5c542}.slot.bonus{border-color:#f5c54299!important}.slot .bstar{position:absolute;top:4px;right:6px;z-index:3;font-size:12px;color:#f5c542;text-shadow:0 0 4px #000}.slot.empty.bonus .en{color:#f5c542}
 .shelf{padding:4px 2px}.shead{display:flex;justify-content:space-between;align-items:baseline;padding:4px 4px 8px}.shead b{font-size:17px}
 .sgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
 .stile{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px;cursor:pointer;display:flex;flex-direction:column;gap:3px;min-width:0}.stile:active{transform:scale(.97)}
@@ -139,7 +139,7 @@ svg.spark{width:100%;height:80px;background:var(--card);border:1px solid var(--l
 <script>
 (function(){
 "use strict";
-var VERSION="1.11.0",BUILD="2026-11-09";
+var VERSION="1.11.1",BUILD="2026-11-09";
 var KEY="pokebinder.v1";
 var API="https://api.pokemontcg.io/v2/cards";
 var SETS_API="https://api.pokemontcg.io/v2/sets";
@@ -752,8 +752,8 @@ function binderPages(list,N){
   var groups={},order=[],full=S.settings.fullSets!==false;
   list.forEach(function(c){
     var key=c.setId||("n:"+(c.set||"Other"));
-    var g=groups[key];if(!g){g=groups[key]={name:c.set||"Other",setId:c.setId||"",year:c.year||"9999",total:0,nums:{},extra:[]};order.push(g);}
-    g.total=Math.max(g.total,c.setPrinted||c.setTotal||0);
+    var g=groups[key];if(!g){g=groups[key]={name:c.set||"Other",setId:c.setId||"",year:c.year||"9999",total:0,known:0,nums:{},extra:[]};order.push(g);}
+    g.total=Math.max(g.total,c.setPrinted||c.setTotal||0);g.known=Math.max(g.known,c.setTotal||0);
     var n=/^\d+$/.test(String(c.num||""))?parseInt(c.num,10):0;
     if(n>0){var e=g.nums[n];if(e){e.qty+=c.qty;e.trade=e.trade||c.trade;e.foil=e.foil||!!c.foil;}else g.nums[n]={c:c,qty:c.qty,trade:!!c.trade,foil:!!c.foil};}
     else g.extra.push({c:c,qty:c.qty,trade:!!c.trade});
@@ -762,14 +762,15 @@ function binderPages(list,N){
   var pages=[];
   order.forEach(function(g){
     var max=0;Object.keys(g.nums).forEach(function(k){if(+k>max)max=+k;});
-    var total=full?Math.max(max,g.total):max;
+    var total=full?Math.max(max,g.total,g.known):max;
     var all=[];for(var i=1;i<=total;i++)all.push(g.nums[i]||null);
     g.extra.forEach(function(e){all.push(e);});
     for(var p=0;p<all.length;p+=N){
       var sl=all.slice(p,p+N);while(sl.length<N)sl.push(null);
       if(!full&&!sl.some(function(x){return x;}))continue;
       var nm=[];for(var q=0;q<N;q++){var ix=p+q;nm.push((ix<total||(full&&ix>=all.length))?("00"+(ix+1)).slice(-3):"");}
-      pages.push({name:g.name,setId:g.setId,owned:Object.keys(g.nums).length,setSize:Math.max(g.total,max),slots:sl,nums:nm,range:(p+1)+"–"+Math.min(p+N,total||all.length)});
+      var bo=0,mo=0;Object.keys(g.nums).forEach(function(k){if(g.total&&+k>g.total)bo++;else mo++;});
+      pages.push({name:g.name,setId:g.setId,printed:g.total,owned:g.total?mo:Object.keys(g.nums).length,bonusOwned:bo,bonusKnown:Math.max(0,g.known-g.total),setSize:g.total||Math.max(g.total,max),slots:sl,nums:nm,range:(p+1)+"–"+Math.min(p+N,total||all.length)});
     }
   });
   if(!pages.length){var e=[];for(var z=0;z<N;z++)e.push(null);pages.push({name:"",setId:"",slots:e,nums:e.map(function(){return "";}),range:""});}
@@ -795,12 +796,12 @@ function viewShelf(list){
   var g={},ord=[];
   list.forEach(function(c){var k=c.setId||("n:"+(c.set||"Other"));var x=g[k];if(!x){x=g[k]={k:k,name:c.set||"Other",setId:c.setId||"",year:c.year||"9999",total:0,nums:{},n:0,qty:0,val:0,imgs:[]};ord.push(x);}
     if(c.small&&x.imgs.length<3&&x.imgs.indexOf(c.small)<0)x.imgs.push(c.small);
-    x.total=Math.max(x.total,c.setPrinted||c.setTotal||0);x.qty+=c.qty;x.val+=(c.price||0)*c.qty;var nn=parseInt(c.num,10);if(nn>0)x.nums[nn]=1;else x.n++;});
+    x.total=Math.max(x.total,c.setPrinted||c.setTotal||0);x.known=Math.max(x.known||0,c.setTotal||0);x.qty+=c.qty;x.val+=(c.price||0)*c.qty;var nn=parseInt(c.num,10);if(nn>0)x.nums[nn]=1;else x.n++;});
   ord.sort(function(a,b){return String(a.year).localeCompare(String(b.year))||a.name.localeCompare(b.name);});
   var all=0,tot=0,val=0;
   var tiles=ord.map(function(x){
-    var own=Object.keys(x.nums).length+x.n,den=Math.max(x.total,own),pc=den?Math.round(own/den*100):0;all+=own;tot+=den;val+=x.val;
-    return '<div class="stile" data-a="pickset" data-k="'+esc(x.k)+'"><div class="slogo">'+(function(){fetchArt(x.k,x.setId);var u=ART[x.k];if(u)return '<img class="lg" src="'+esc(u)+'" alt="" onerror="this.outerHTML=\'<i></i>\'">';if(!x.imgs.length)return '<i></i>';return '<span class="fan">'+x.imgs.map(function(m,ix){return '<img src="'+esc(m)+'" alt="" style="--r:'+((ix-(x.imgs.length-1)/2)*12)+'deg;--x:'+((ix-(x.imgs.length-1)/2)*26)+'px">';}).join("")+'</span>';})()+'</div><b>'+esc(x.name)+'</b><div class="note">'+(x.year!=="9999"?x.year+' · ':'')+own+' / '+den+(pc>=100?' ✓':'')+'</div><div class="track"><div style="width:'+Math.min(100,pc)+'%"></div></div><div class="note">'+(x.val?money(x.val):'')+'</div></div>';
+    var bon=0;Object.keys(x.nums).forEach(function(k){if(x.total&&+k>x.total)bon++;});var own=Object.keys(x.nums).length+x.n-bon,den=Math.max(x.total,own),pc=den?Math.round(own/den*100):0;all+=own;tot+=den;val+=x.val;
+    return '<div class="stile" data-a="pickset" data-k="'+esc(x.k)+'"><div class="slogo">'+(function(){fetchArt(x.k,x.setId);var u=ART[x.k];if(u)return '<img class="lg" src="'+esc(u)+'" alt="" onerror="this.outerHTML=\'<i></i>\'">';if(!x.imgs.length)return '<i></i>';return '<span class="fan">'+x.imgs.map(function(m,ix){return '<img src="'+esc(m)+'" alt="" style="--r:'+((ix-(x.imgs.length-1)/2)*12)+'deg;--x:'+((ix-(x.imgs.length-1)/2)*26)+'px">';}).join("")+'</span>';})()+'</div><b>'+esc(x.name)+'</b><div class="note">'+(x.year!=="9999"?x.year+' · ':'')+own+' / '+den+(pc>=100?' ✓':'')+(bon?' · ★'+bon:'')+'</div><div class="track"><div style="width:'+Math.min(100,pc)+'%"></div></div><div class="note">'+(x.val?money(x.val):'')+'</div></div>';
   }).join("");
   return '<div class="shelf"><div class="shead"><b>Choose a binder</b><span class="note">'+ord.length+' set'+(ord.length===1?'':'s')+' · '+all+(tot?' / '+tot:'')+' cards</span></div><div class="sgrid"><div class="stile all" data-a="pickset" data-k="*"><div class="slogo"><i></i></div><b>All sets</b><div class="note">One long binder</div><div class="note">'+(val?money(val):'')+'</div></div>'+tiles+'</div></div>';
 }
@@ -820,8 +821,9 @@ function viewCol(){
       if(c){
         var ty=String(c.types||"").split("/")[0];if(ty)tc[ty]=(tc[ty]||0)+1;
         var rr=c.rarity||"",holo=!!(e.foil||c.foil)||/holo|double|ultra|illustration|hyper|secret|ace|radiant|amazing|vmax|vstar|\bex\b|shiny|special|rainbow|gold/i.test(rr),shine=holo||(rr&&!/^(common|uncommon)$/i.test(rr));
-        slots+='<div class="slot'+(shine?' shine':'')+(holo?' holo':'')+'" data-a="manage" data-i="'+c.id+'"><span class="sn">'+esc(c.name)+'</span>'+(c.small?'<img loading="lazy" src="'+esc(c.small)+'" alt="'+esc(c.name)+'" data-a="manage" data-i="'+c.id+'">':'<span class="sn" data-a="manage" data-i="'+c.id+'"></span>')+(e.qty>1?'<span class="qb">×'+e.qty+'</span>':'')+(e.trade?'<span class="tb">⇄</span>':'')+'</div>';
-      }else slots+='<div class="slot empty"'+(pg.nums[idx]&&pg.setId?' data-a="blank" data-set="'+esc(pg.setId)+'" data-n="'+pg.nums[idx]+'"':'')+'>'+(pg.nums[idx]?'<span class="en">#'+pg.nums[idx]+'</span>':'')+'</div>';
+        var isB=pg.printed&&parseInt(pg.nums[idx],10)>pg.printed;
+        slots+='<div class="slot'+(shine?' shine':'')+(holo?' holo':'')+(isB?' bonus':'')+'" data-a="manage" data-i="'+c.id+'">'+(isB?'<span class="bstar">★</span>':'')+'<span class="sn">'+esc(c.name)+'</span>'+(c.small?'<img loading="lazy" src="'+esc(c.small)+'" alt="'+esc(c.name)+'" data-a="manage" data-i="'+c.id+'">':'<span class="sn" data-a="manage" data-i="'+c.id+'"></span>')+(e.qty>1?'<span class="qb">×'+e.qty+'</span>':'')+(e.trade?'<span class="tb">⇄</span>':'')+'</div>';
+      }else slots+='<div class="slot empty'+(pg.printed&&parseInt(pg.nums[idx],10)>pg.printed?' bonus':'')+'"'+(pg.nums[idx]&&pg.setId?' data-a="blank" data-set="'+esc(pg.setId)+'" data-n="'+pg.nums[idx]+'"':'')+'>'+(pg.nums[idx]?'<span class="en">'+(pg.printed&&parseInt(pg.nums[idx],10)>pg.printed?'★ ':'')+'#'+pg.nums[idx]+'</span>':'')+'</div>';
     });
     var top=Object.keys(tc).sort(function(a,b){return tc[b]-tc[a];})[0],acc=TYPECOL[top]||"#3b82f6";
     var fc=S.flip||"";S.flip="";
@@ -829,6 +831,7 @@ function viewCol(){
     var bar='<div class="tb2"><button class="btn alt sm" data-a="shelf" title="All binders">▦</button><button class="btn alt sm" data-a="pgprev"'+(S.page===0?' disabled':'')+'>‹</button><div class="ttl"><b>'+esc(pg.name)+'</b>'+(pg.range?' · #'+pg.range:'')+' · '+(S.page+1)+'/'+pages.length+'</div><button class="btn alt sm" data-a="pgnext"'+(S.page>=pages.length-1?' disabled':'')+'>›</button><button class="btn sm '+(S.showFilter?"on":"alt")+'" data-a="tfilter">🔍</button><button class="btn alt sm" data-a="sharepg" title="Share this page">📤</button><button class="btn alt sm" data-a="vlist">List</button></div>';
     return bar+(S.showFilter?filterRow(false):"")+'<div class="bpage '+fc+'" style="--acc:'+acc+';--acc-a:'+acc+'2e">'+(pg.setId?'<img class="wm" src="https://images.pokemontcg.io/'+esc(pg.setId)+'/logo.png" alt="" onerror="this.remove()" onload="if(this.naturalWidth<this.naturalHeight*1.2)this.remove()">':'')+'<div class="bg" id="bgrid" data-c="'+L.c+'" data-r="'+L.r+'" style="grid-template-columns:repeat('+L.c+',1fr)">'+slots+'</div></div>'+
       '<div class="bfoot" id="bfoot">'+(pg.setSize?'<div class="bar" style="margin:0 0 4px"><span style="width:auto">'+pg.owned+' / '+pg.setSize+'</span><div class="track"><div style="width:'+Math.min(100,pg.owned/pg.setSize*100)+'%"></div></div><span style="width:auto">'+Math.round(pg.owned/pg.setSize*100)+'%</span></div>':'')+
+      (pg.printed&&(pg.bonusOwned||pg.bonusKnown||/★/.test(slots))?'<div class="note bnote">★ Bonus cards (numbered past the set\'s '+pg.printed+'): you have '+pg.bonusOwned+(pg.bonusKnown?' of '+pg.bonusKnown+' listed':'')+'</div>':'')+
       (pages.length>1?'<input type="range" id="pgslide" min="0" max="'+(pages.length-1)+'" value="'+S.page+'" style="width:100%;padding:0">':'')+'</div>';
   }
   list.sort(function(a,b){
