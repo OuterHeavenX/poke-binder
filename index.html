@@ -139,7 +139,7 @@ svg.spark{width:100%;height:80px;background:var(--card);border:1px solid var(--l
 <script>
 (function(){
 "use strict";
-var VERSION="1.10.1",BUILD="2026-11-09";
+var VERSION="1.11.0",BUILD="2026-11-09";
 var KEY="pokebinder.v1";
 var API="https://api.pokemontcg.io/v2/cards";
 var SETS_API="https://api.pokemontcg.io/v2/sets";
@@ -682,6 +682,21 @@ function infoHtml(c,j){
   if(j&&j.tcgplayer&&j.tcgplayer.url)h+='<div style="margin-top:6px"><a href="'+esc(j.tcgplayer.url)+'" target="_blank" rel="noopener" style="color:var(--acc,#60a5fa)">View on TCGplayer ↗</a></div>';
   return h;
 }
+function sibling(c,foil){return S.cards.find(function(x){return x.id!==c.id&&x.cid===c.cid&&x.cond===c.cond&&x.owner===c.owner&&(x.pack||"")===(c.pack||"")&&!!x.foil===!!foil;});}
+function repriceFor(x){if(x.info){var r=priceInfo(x.info,x.foil,x.info._site||"");if(r){x.price=r.v;x.psrc=r.src;}}}
+function addCopies(c,n,foil){
+  if(!!c.foil===!!foil){c.qty+=n;return c;}
+  var t=sibling(c,foil);
+  if(t){t.qty+=n;return t;}
+  t=Object.assign({},c,{id:uid(),qty:n,foil:!!foil,trade:false,added:Date.now()});repriceFor(t);S.cards.push(t);return t;
+}
+function moveFinish(c,n,foil){
+  n=Math.max(1,Math.min(n,c.qty));
+  var t=addCopies(c,n,foil);
+  if(t===c)return c;
+  c.qty-=n;if(c.qty<=0)S.cards=S.cards.filter(function(x){return x.id!==c.id;});
+  save();return t;
+}
 function manage(id){
   var c=findCard(S.cards,id,"id");if(!c)return;
   var d=$("dlg");
@@ -691,8 +706,10 @@ function manage(id){
    '<div class="note">'+esc(c.owner)+' · '+esc(c.cond)+(c.foil?' · foil':'')+'</div>'+
    '<div style="display:flex;align-items:baseline;gap:10px;margin:8px 0 0"><span style="font-size:24px;font-weight:700" id="mpv">'+(c.price?money(c.price):'—')+'</span><span class="note" id="mpn">'+(c.price?'current value each'+(c.qty>1?' · '+money(c.price*c.qty)+' total':''):'checking price…')+'</span></div>'+
    '<div class="note" id="mpsrc">'+(c.price&&c.psrc?'Source: '+esc(c.psrc):'')+'</div><div id="mspark">'+dlgSpark(hist)+'</div><div id="minfo" class="note">Loading details…</div>'+
-   '<div class="row" style="margin:12px 0 8px"><button class="btn alt" id="mdn">−</button><b style="min-width:60px;text-align:center">×'+c.qty+'</b><button class="btn alt" id="mup">+</button>'+
+   (function(){var sib=S.cards.filter(function(x){return x.id!==c.id&&x.cid===c.cid&&x.owner===c.owner&&x.cond===c.cond;});if(!sib.length)return '';return '<div class="row" style="margin:8px 0 0"><span class="note">Also own:</span>'+sib.map(function(x){return '<button class="btn alt sm" data-sib="'+x.id+'">'+(x.foil?'Holo':'Standard')+' ×'+x.qty+'</button>';}).join("")+'</div>';})()+
+   '<div class="row" id="mqrow" style="margin:12px 0 8px"><button class="btn alt" id="mdn">−</button><b style="min-width:60px;text-align:center">×'+c.qty+'</b><button class="btn alt" id="mup">+</button>'+
    '<button class="btn '+(c.trade?'on':'alt')+'" id="mtr">⇄ For trade</button></div>'+
+   '<div class="row" style="margin:0 0 8px"><span class="note">Finish: <b>'+(c.foil?'Holo / foil':'Standard')+'</b></span>'+(c.qty>1?'<select id="mfn" style="width:auto;padding:6px 8px">'+Array.apply(null,Array(c.qty)).map(function(_,i){return '<option value="'+(i+1)+'">'+(i+1)+'</option>';}).join("")+'</select>':'')+'<button class="btn alt sm" id="mfin">'+(c.foil?'Make standard':'Upgrade to holo')+'</button></div>'+
    '<div class="row" style="margin:0"><button class="btn alt" id="mcl">Close</button><button class="btn bad" id="mrm">Remove</button></div></div>';
   if(c.cid&&c.cid.indexOf("manual-")!==0){
     var show=function(j){var el=$("minfo");if(!el||!d.open)return;el.className="";el.innerHTML=infoHtml(c,j);if(!(j&&anyPrice(j,c.foil))&&$("mpn")&&!c.price)$("mpn").textContent="no market price listed";
@@ -704,7 +721,14 @@ function manage(id){
   }else $("minfo").textContent="Manually added card.";
   if(!d.open)d.showModal();
   $("mcl").onclick=function(){d.close();};
-  $("mup").onclick=function(){buzz();c.qty++;save();render();manage(id);};
+  $("mup").onclick=function(){buzz();
+    $("mqrow").innerHTML='<span class="note">Add one:</span><button class="btn alt" id="mps">Standard</button><button class="btn alt" id="mph">Holo / foil</button><button class="btn alt sm" id="mpc">Cancel</button>';
+    $("mps").onclick=function(){addCopies(c,1,false);save();render();manage(id);};
+    $("mph").onclick=function(){addCopies(c,1,true);save();render();manage(id);};
+    $("mpc").onclick=function(){manage(id);};
+  };
+  $("mfin").onclick=function(){buzz();var n=$("mfn")?+$("mfn").value:1;var t=moveFinish(c,n,!c.foil);render();manage(t.id);if(!t.info)refreshPrices(true);};
+  Array.prototype.forEach.call(d.querySelectorAll("[data-sib]"),function(b){b.onclick=function(){manage(b.dataset.sib);};});
   $("mdn").onclick=function(){if(c.qty>1){buzz();c.qty--;save();render();manage(id);}else if(confirm("Remove "+c.name+"?")){S.cards=S.cards.filter(function(x){return x.id!==id;});save();d.close();render();}};
   $("mtr").onclick=function(){c.trade=!c.trade;save();render();manage(id);};
   $("mrm").onclick=function(){if(confirm("Remove all copies of "+c.name+"?")){S.cards=S.cards.filter(function(x){return x.id!==id;});save();d.close();render();}};
@@ -731,7 +755,7 @@ function binderPages(list,N){
     var g=groups[key];if(!g){g=groups[key]={name:c.set||"Other",setId:c.setId||"",year:c.year||"9999",total:0,nums:{},extra:[]};order.push(g);}
     g.total=Math.max(g.total,c.setPrinted||c.setTotal||0);
     var n=/^\d+$/.test(String(c.num||""))?parseInt(c.num,10):0;
-    if(n>0){var e=g.nums[n];if(e){e.qty+=c.qty;e.trade=e.trade||c.trade;}else g.nums[n]={c:c,qty:c.qty,trade:!!c.trade};}
+    if(n>0){var e=g.nums[n];if(e){e.qty+=c.qty;e.trade=e.trade||c.trade;e.foil=e.foil||!!c.foil;}else g.nums[n]={c:c,qty:c.qty,trade:!!c.trade,foil:!!c.foil};}
     else g.extra.push({c:c,qty:c.qty,trade:!!c.trade});
   });
   order.sort(function(a,b){return String(a.year).localeCompare(String(b.year))||a.name.localeCompare(b.name);});
@@ -795,7 +819,7 @@ function viewCol(){
       var c=e&&e.c;
       if(c){
         var ty=String(c.types||"").split("/")[0];if(ty)tc[ty]=(tc[ty]||0)+1;
-        var rr=c.rarity||"",holo=!!c.foil||/holo|double|ultra|illustration|hyper|secret|ace|radiant|amazing|vmax|vstar|\bex\b|shiny|special|rainbow|gold/i.test(rr),shine=holo||(rr&&!/^(common|uncommon)$/i.test(rr));
+        var rr=c.rarity||"",holo=!!(e.foil||c.foil)||/holo|double|ultra|illustration|hyper|secret|ace|radiant|amazing|vmax|vstar|\bex\b|shiny|special|rainbow|gold/i.test(rr),shine=holo||(rr&&!/^(common|uncommon)$/i.test(rr));
         slots+='<div class="slot'+(shine?' shine':'')+(holo?' holo':'')+'" data-a="manage" data-i="'+c.id+'"><span class="sn">'+esc(c.name)+'</span>'+(c.small?'<img loading="lazy" src="'+esc(c.small)+'" alt="'+esc(c.name)+'" data-a="manage" data-i="'+c.id+'">':'<span class="sn" data-a="manage" data-i="'+c.id+'"></span>')+(e.qty>1?'<span class="qb">×'+e.qty+'</span>':'')+(e.trade?'<span class="tb">⇄</span>':'')+'</div>';
       }else slots+='<div class="slot empty"'+(pg.nums[idx]&&pg.setId?' data-a="blank" data-set="'+esc(pg.setId)+'" data-n="'+pg.nums[idx]+'"':'')+'>'+(pg.nums[idx]?'<span class="en">#'+pg.nums[idx]+'</span>':'')+'</div>';
     });
