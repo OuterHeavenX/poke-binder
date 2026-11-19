@@ -144,7 +144,7 @@ svg.spark{width:100%;height:80px;background:var(--card);border:1px solid var(--l
 <script>
 (function(){
 "use strict";
-var VERSION="1.13.0",BUILD="2026-11-09";
+var VERSION="1.14.0",BUILD="2026-11-09";
 var KEY="pokebinder.v1";
 var API="https://api.pokemontcg.io/v2/cards";
 var SETS_API="https://api.pokemontcg.io/v2/sets";
@@ -584,14 +584,31 @@ function refreshPrices(quiet){
 function loadSets(){
   if(S.sets.length||S.setsStatus==="loading")return;
   S.setsStatus="loading";render();
-  apiGet(SETS_API+"?orderBy=-releaseDate&select=id,name,series,printedTotal,total,releaseDate,images").then(function(j){
-    S.sets=j.data||[];S.setsStatus="";render();
-  }).catch(function(e){S.setsStatus="Couldn't load sets: "+(e&&e.message||e);render();});
+  var err=null;
+  Promise.all([
+    apiGet(SETS_API+"?orderBy=-releaseDate&select=id,name,series,printedTotal,total,releaseDate,images").then(function(j){return j.data||[];}).catch(function(e){err=e;return [];}),
+    fetch(DEX+"/sets").then(function(r){return r.ok?r.json():[];}).catch(function(){return [];})
+  ]).then(function(r){
+    var a=r[0],d=r[1],names={};a.forEach(function(x){names[String(x.name).toLowerCase()]=1;});
+    var extra=d.filter(function(x){return x&&x.name&&!names[x.name.toLowerCase()];}).map(function(x){var cc=x.cardCount||{};return {id:x.id,name:x.name,series:"",printedTotal:cc.official||0,total:cc.total||cc.official||0,releaseDate:"",images:{symbol:x.symbol?x.symbol+".png":"",logo:x.logo?x.logo+".png":""},dex:true};}).reverse();
+    S.sets=extra.concat(a);
+    S.setsStatus=S.sets.length?"":"Couldn't load sets: "+(err&&err.message||"network");
+    render();
+  });
 }
 function openSet(id){
   var s=S.sets.find(function(x){return x.id===id;});if(!s)return;
   S.setView={id:id,name:s.name,total:s.total||s.printedTotal,cards:[],status:"Loading cards…"};render();
   var all=[];
+  if(s.dex){
+    fetch(DEX+"/sets/"+encodeURIComponent(id)).then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.json();}).then(function(d){
+      var cc=d.cardCount||{};
+      var cs=(d.cards||[]).map(function(c){return {id:c.id,name:c.name,number:c.localId,rarity:"",types:[],supertype:"",images:{small:c.image?c.image+"/low.webp":"",large:c.image?c.image+"/high.webp":""},set:{id:d.id,name:d.name,total:cc.total||cc.official||0,printedTotal:cc.official||cc.total||0,releaseDate:d.releaseDate||""},tcgplayer:{prices:{}}};});
+      cs.sort(function(a,b){return (parseInt(a.number,10)||9999)-(parseInt(b.number,10)||9999);});
+      if(S.setView&&S.setView.id===id){S.setView.cards=cs;S.setView.status=cs.length?"":"No cards listed yet for this set.";render();}
+    }).catch(function(e){if(S.setView&&S.setView.id===id){S.setView.status="Couldn't load: "+(e&&e.message||e);render();}});
+    return;
+  }
   (function page(n){
     apiGet(API+"?q="+encodeURIComponent("set.id:"+id)+"&pageSize=250&page="+n+"&select=id,name,number,rarity,images,set,tcgplayer,types,supertype").then(function(j){
       all=all.concat(j.data||[]);
@@ -926,11 +943,11 @@ function viewSets(){
   if(S.setsStatus==="loading")return h2+'<div class="msg">Loading sets…</div>';
   if(S.setsStatus)return h2+'<div class="msg">'+esc(S.setsStatus)+'<br><button class="btn sm" data-a="reloadsets">Try again</button></div>';
   var list=S.sets.filter(function(s){return !f||(s.name+" "+s.series).toLowerCase().indexOf(f)>-1;});
-  list.sort(function(a,b){return (per[b.id]||0)-(per[a.id]||0)||0;});
+  list.sort(function(a,b){var an=/30th/i.test(a.name)?1:0,bn=/30th/i.test(b.name)?1:0;return (bn-an)||(per[b.id]||0)-(per[a.id]||0)||0;});
   return h2+list.map(function(s){
     var n=per[s.id]||0,t=s.total||s.printedTotal||1;
     return '<div class="li" data-a="openset" data-i="'+esc(s.id)+'" style="cursor:pointer">'+(s.images&&s.images.symbol?'<img src="'+esc(s.images.symbol)+'" alt="" style="width:34px;height:34px;object-fit:contain">':'')+
-     '<div class="g"><b>'+esc(s.name)+'</b><div class="note">'+esc(s.series)+' · '+esc((s.releaseDate||"").slice(0,4))+'</div><div class="bar" style="margin:4px 0 0"><div class="track"><div style="width:'+Math.min(100,n/t*100)+'%"></div></div><span>'+n+'/'+t+'</span></div></div></div>';
+     '<div class="g"><b>'+(/30th/i.test(s.name)?'🎂 ':'')+esc(s.name)+'</b><div class="note">'+esc(s.series||'Newest sets')+(s.releaseDate?' · '+esc(s.releaseDate.slice(0,4)):'')+'</div><div class="bar" style="margin:4px 0 0"><div class="track"><div style="width:'+Math.min(100,n/t*100)+'%"></div></div><span>'+n+'/'+t+'</span></div></div></div>';
   }).join("");
 }
 function viewWish(){
