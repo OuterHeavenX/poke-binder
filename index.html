@@ -144,7 +144,7 @@ svg.spark{width:100%;height:80px;background:var(--card);border:1px solid var(--l
 <script>
 (function(){
 "use strict";
-var VERSION="1.14.0",BUILD="2026-11-09";
+var VERSION="1.14.1",BUILD="2026-11-09";
 var KEY="pokebinder.v1";
 var API="https://api.pokemontcg.io/v2/cards";
 var SETS_API="https://api.pokemontcg.io/v2/sets";
@@ -589,10 +589,21 @@ function loadSets(){
     apiGet(SETS_API+"?orderBy=-releaseDate&select=id,name,series,printedTotal,total,releaseDate,images").then(function(j){return j.data||[];}).catch(function(e){err=e;return [];}),
     fetch(DEX+"/sets").then(function(r){return r.ok?r.json():[];}).catch(function(){return [];})
   ]).then(function(r){
-    var a=r[0],d=r[1],names={};a.forEach(function(x){names[String(x.name).toLowerCase()]=1;});
+    var a=r[0],d=r[1],names={};S.dexN=d.length;S.dexTail=d.slice(-8).map(function(x){return x.name;});a.forEach(function(x){names[String(x.name).toLowerCase()]=1;});
     var extra=d.filter(function(x){return x&&x.name&&!names[x.name.toLowerCase()];}).map(function(x){var cc=x.cardCount||{};return {id:x.id,name:x.name,series:"",printedTotal:cc.official||0,total:cc.total||cc.official||0,releaseDate:"",images:{symbol:x.symbol?x.symbol+".png":"",logo:x.logo?x.logo+".png":""},dex:true};}).reverse();
     S.sets=extra.concat(a);
     S.setsStatus=S.sets.length?"":"Couldn't load sets: "+(err&&err.message||"network");
+    render();
+  });
+}
+function find30(){
+  S.look="Searching…";render();
+  var qs=["30th","celebration","anniversary"],seen={},found=[];
+  Promise.all(qs.map(function(q){return fetch(DEX+"/sets?name="+encodeURIComponent(q)).then(function(r){return r.ok?r.json():[];}).catch(function(){return [];});})).then(function(rs){
+    rs.forEach(function(a){(a||[]).forEach(function(x){if(x&&x.id&&!seen[x.id]){seen[x.id]=1;found.push(x);}});});
+    var have={};S.sets.forEach(function(x){have[x.id]=1;});
+    found.forEach(function(x){if(!have[x.id]){var cc=x.cardCount||{};S.sets.unshift({id:x.id,name:x.name,series:"",printedTotal:cc.official||0,total:cc.total||cc.official||0,releaseDate:"",images:{symbol:x.symbol?x.symbol+".png":"",logo:x.logo?x.logo+".png":""},dex:true});}});
+    S.look=found.length?"Found: "+found.map(function(x){return x.name;}).join(", "):"TCGdex has no set matching 30th/celebration/anniversary yet. Newest it lists: "+(S.dexTail||[]).join(", ")+". (Sets loaded: "+(S.dexN||0)+")";
     render();
   });
 }
@@ -943,6 +954,7 @@ function viewSets(){
   if(S.setsStatus==="loading")return h2+'<div class="msg">Loading sets…</div>';
   if(S.setsStatus)return h2+'<div class="msg">'+esc(S.setsStatus)+'<br><button class="btn sm" data-a="reloadsets">Try again</button></div>';
   var list=S.sets.filter(function(s){return !f||(s.name+" "+s.series).toLowerCase().indexOf(f)>-1;});
+  if(!S.sets.some(function(s){return /30th/i.test(s.name);}))h2+='<div class="row"><button class="btn sm" data-a="find30">🎂 Find 30th Celebration</button></div>'+(S.look?'<div class="note">'+esc(S.look)+'</div>':'');
   list.sort(function(a,b){var an=/30th/i.test(a.name)?1:0,bn=/30th/i.test(b.name)?1:0;return (bn-an)||(per[b.id]||0)-(per[a.id]||0)||0;});
   return h2+list.map(function(s){
     var n=per[s.id]||0,t=s.total||s.printedTotal||1;
@@ -1146,6 +1158,7 @@ $("main").onclick=function(e){
   else if(a==="wdel"){S.wish=S.wish.filter(function(x){return x.id!==i;});save();render();}
   else if(a==="openset"){openSet(i);}
   else if(a==="closeset"){S.setView=null;render();}
+  else if(a==="find30"){find30();}
   else if(a==="reloadsets"){S.setsStatus="";loadSets();}
   else if(a==="refresh"){refreshPrices();}
   else if(a==="marktrade"){S.cards.forEach(function(c){if(c.qty>1)c.trade=true;});save();render();}
