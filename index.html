@@ -42,6 +42,7 @@ main.binder{padding:6px 6px 8px}
 .stile .slogo{height:64px;display:flex;align-items:center;justify-content:center;position:relative}.stile .fan{position:relative;width:100%;height:100%}.stile .fan img{position:absolute;left:50%;top:0;height:100%;width:auto;max-height:none;border-radius:4px;transform:translateX(calc(-50% + var(--x))) rotate(var(--r));box-shadow:0 2px 6px #0008}.stile .slogo img.lg{max-height:56px;max-width:100%;object-fit:contain}.stile .slogo img{max-height:44px;max-width:100%;width:auto;object-fit:contain;border-radius:0}
 .stile .slogo i{width:30px;height:30px;border-radius:50%;background:linear-gradient(180deg,var(--red) 46%,#222 46% 54%,#fff 54%);border:2px solid #222;display:inline-block}
 .stile.all{border-style:dashed;grid-column:1/-1;align-items:center;text-align:center;padding:12px}.stile.all .slogo{height:40px}.stile.all .note{margin:0}.stile.all b{max-width:100%}.stile .track{flex:none;height:6px;margin:2px 0}
+.rar{margin:6px 0 2px;font-size:13px;line-height:1.35}.rar a{color:var(--blu);white-space:nowrap}
 .tb2{display:flex;align-items:center;gap:5px;margin-bottom:5px}
 .tb2 .btn.sm{padding:5px 9px}
 .tb2 .ttl{flex:1;text-align:center;font-size:13px;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
@@ -158,7 +159,7 @@ svg.spark{width:100%;height:80px;background:var(--card);border:1px solid var(--l
 <script>
 (function(){
 "use strict";
-var VERSION="1.16.0",BUILD="2026-11-09";
+var VERSION="1.17.0",BUILD="2026-11-09";
 var KEY="pokebinder.v1";
 var API="https://api.pokemontcg.io/v2/cards";
 var SETS_API="https://api.pokemontcg.io/v2/sets";
@@ -188,6 +189,41 @@ function cls(k){return /reverse/i.test(k)?"rev":/holo/i.test(k)?"holo":"norm";}
 var FIN={std:"Standard",holo:"Holo",rev:"Reverse holo"};
 function fin(c){var f=c&&c.finish;if(f==="holo"||f==="rev"||f==="std")return f;return c&&c.foil?"holo":"std";}
 function nf(f){return f===true?"holo":(f==="holo"||f==="rev")?f:"std";}
+function finsOf(card){var p=card&&card.tcgplayer&&card.tcgplayer.prices,o=[];if(!p)return o;
+  Object.keys(p).forEach(function(k){var x=p[k]||{};if(!(x.market||x.mid||x.low||x.directLow||x.high))return;var f=({norm:"std",holo:"holo",rev:"rev"})[cls(k)];if(f&&o.indexOf(f)<0)o.push(f);});
+  return ["std","holo","rev"].filter(function(k){return o.indexOf(k)>-1;});}
+var RAR={
+ "common":["●","Usually also printed as a reverse holo."],
+ "uncommon":["◆","Usually also printed as a reverse holo."],
+ "rare":["★","Plain Rare. In Scarlet & Violet and Mega Evolution sets the Rare is a holo; it can also be a reverse holo."],
+ "double rare":["★★ black","A regular-art Pokémon ex. Holo."],
+ "ultra rare":["★★ silver","Full-art Pokémon ex or Supporter, numbered past the set's printed total. Holo, usually textured."],
+ "illustration rare":["★ gold","Full-art illustrated Pokémon (not ex), numbered past the printed total. Holo, usually textured."],
+ "special illustration rare":["★★ gold","Alternate-art ex or Supporter with a scene-style illustration. The top chase tier below gold. Holo, usually textured."],
+ "hyper rare":["★★★ gold","Gold-etched card, numbered past the set size."],
+ "mega hyper rare":["★ gold, black border","Gold-etched holo full art of a Mega Evolution ex. The rarest tier in the Mega Evolution era."],
+ "mega attack rare":["","A Mega Evolution-era rarity for Mega Pokémon ex (introduced with Ascended Heroes)."],
+ "ace spec rare":["","ACE SPEC card: holo, only one per deck."]
+};
+function finList(a){return a.map(function(k){return FIN[k];}).join(" + ");}
+function rarityBlock(c){
+  var r=String(c.rarity||"").trim(),g=RAR[r.toLowerCase()],h="";
+  if(r)h+='<div class="rar"><b>'+(g&&g[0]?esc(g[0])+' · ':'')+esc(r)+'</b>'+(g?' — '+esc(g[1]):'')+' <a href="#" id="mrg">What do these mean?</a></div>';
+  var fs=c.fins||[];
+  if(fs.length){h+='<div class="note">Finishes TCGplayer lists for this card: <b>'+finList(fs)+'</b>'+(fs.length===1?' (only one)':'')+'.</div>';
+    if(c.id&&c.finish&&fs.indexOf(fin(c))<0)h+='<div class="note" style="color:var(--yel)">⚠ You marked this as '+FIN[fin(c)].toLowerCase()+', which TCGplayer doesn\'t list for this card. Double-check the card in your hand.</div>';}
+  else h+='<div class="note">Finish list not confirmed yet (Stats → Refresh prices fills it in).</div>';
+  return h;
+}
+function rarityGuide(){
+  var d=$("dlg"),rows=["common","uncommon","rare","double rare","ultra rare","illustration rare","special illustration rare","hyper rare","mega hyper rare"];
+  d.innerHTML='<div style="max-height:84vh;overflow:auto"><b style="font-size:17px">Rarity guide</b><div class="note" style="margin:4px 0 8px">Shown as printed in the bottom corner of the card. Finish (holo / reverse) is separate and comes from the card database, not a guess.</div>'+
+   rows.map(function(k){var g=RAR[k];return '<div style="margin:0 0 8px"><b>'+(g[0]?esc(g[0])+' · ':'')+k.replace(/\b./g,function(m){return m.toUpperCase();})+'</b><div class="note">'+esc(g[1])+'</div></div>';}).join("")+
+   '<div class="note" style="margin-bottom:8px"><b>Holo</b>: the artwork box shines. <b>Reverse holo</b>: everything except the artwork shines (in Mega Evolution sets it is a plain smooth foil, no ball pattern). Other special finishes exist, such as Poké Ball / Master Ball patterns in some sets and stamped promos; the database does not list them per card, so this app does not guess them.</div>'+
+   '<button class="btn alt" id="rgx">Close</button></div>';
+  if(!d.open)d.showModal();$("rgx").onclick=function(){d.close();};
+}
+function finOpts(c){return c.fins&&c.fins.length?c.fins:["std","holo","rev"];}
 function pick(card,foil){foil=nf(foil);
   var p=card&&card.tcgplayer&&card.tcgplayer.prices;if(!p)return null;
   var order=foil==="rev"?["rev","holo","norm"]:foil==="holo"?["holo","rev","norm"]:["norm","rev","holo"],byc={};
@@ -206,7 +242,7 @@ function anyPrice(j,foil){var r=priceInfo(j,foil);return r?r.v:0;}
 function snap(card){
   return {cid:card.id,name:card.name,set:(card.set&&card.set.name)||"",setId:(card.set&&card.set.id)||"",setTotal:(card.set&&(card.set.total||card.set.printedTotal))||0,setPrinted:(card.set&&card.set.printedTotal)||0,
     num:card.number||"",rarity:card.rarity||"",types:(card.types||[]).join("/"),supertype:card.supertype||"",
-    small:(card.images&&card.images.small)||"",large:(card.images&&card.images.large)||"",price:price(card),
+    small:(card.images&&card.images.small)||"",large:(card.images&&card.images.large)||"",price:price(card),fins:finsOf(card),
     year:(card.set&&card.set.releaseDate||"").slice(0,4)};
 }
 
@@ -502,9 +538,9 @@ function addToCollection(c,opts){
 function openAdd(c,toWish){
   var d=$("dlg");
   var packOpts=S.packs.length?'<label>From pack<select id="apk"><option value="">None</option>'+S.packs.map(function(p){return '<option value="'+esc(p.id)+'"'+(p.id===S.activePack?" selected":"")+'>'+esc(p.name)+" ("+esc(p.date)+")</option>";}).join("")+'</select></label>':"";
-  d.innerHTML='<div class="adlg"><div class="ahead"><img src="'+esc(c.large||c.small)+'" alt="" onerror="this.style.display=\'none\'"><div><b style="font-size:17px">'+esc(c.name)+'</b><div class="note">'+esc(c.set)+' · #'+esc(c.num)+'</div><div class="note">'+esc(c.rarity)+'</div>'+(c.price?'<div style="font-size:20px;font-weight:700;margin-top:4px">'+money(c.price)+'</div>':'')+'</div></div>'+
+  d.innerHTML='<div class="adlg"><div class="ahead"><img src="'+esc(c.large||c.small)+'" alt="" onerror="this.style.display=\'none\'"><div><b style="font-size:17px">'+esc(c.name)+'</b><div class="note">'+esc(c.set)+' · #'+esc(c.num)+'</div>'+rarityBlock(c).replace(/<a [^>]*>.*?<\/a>/,"")+''+(c.price?'<div style="font-size:20px;font-weight:700;margin-top:4px">'+money(c.price)+'</div>':'')+'</div></div>'+
    (toWish?'':'<div class="f"><div class="two"><label>Quantity<input id="aq" type="number" min="1" value="1"></label><label>Condition<select id="ac">'+CONDS.map(function(x){return "<option"+(x===S.settings.cond?" selected":"")+">"+x+"</option>";}).join("")+'</select></label></div>'+
-   '<div class="two"><label>Owner<select id="ao">'+OWNERS.map(function(x){return "<option"+(x===S.settings.owner?" selected":"")+">"+x+"</option>";}).join("")+'</select></label><label>Finish<select id="af"><option value="std">Standard</option><option value="holo">Holo</option><option value="rev">Reverse holo</option></select></label></div>'+
+   '<div class="two"><label>Owner<select id="ao">'+OWNERS.map(function(x){return "<option"+(x===S.settings.owner?" selected":"")+">"+x+"</option>";}).join("")+'</select></label><label>Finish<select id="af">'+finOpts(c).map(function(k){return '<option value="'+k+'">'+FIN[k]+(c.fins&&c.fins.length===1?' (only finish)':'')+'</option>';}).join("")+'</select></label></div>'+
    packOpts+'<label>Notes<input id="an" type="text" placeholder="optional"></label></div>')+
    '<div class="row" style="margin:10px 0 0"><button class="btn alt" id="ax">Close</button>'+
    (toWish?'<button class="btn good" id="ago">Add to wishlist</button>':'<button class="btn alt" id="aw">+ Wishlist</button><button class="btn good" id="ago">Add to collection</button>')+'</div></div>';
@@ -581,7 +617,7 @@ function refreshPrices(quiet){
     var now=Date.now(),n=0,done={};
     S.cards.concat(S.wish).forEach(function(c){
       var m=map[c.cid];
-      if(m){var r=priceInfo(m.j,fin(c),m.site);if(r){c.price=r.v;c.psrc=r.src;}}
+      if(m){var r=priceInfo(m.j,fin(c),m.site);if(r){c.price=r.v;c.psrc=r.src;}var ff=finsOf(m.j);if(ff.length)c.fins=ff;}
       else if(!c.psrc)c.price=0;
     });
     ids.forEach(function(id){var m=map[id];if(m){var r=priceInfo(m.j,false,m.site);if(r){var h=S.hist[id]||(S.hist[id]=[]);h.push([now,r.v]);if(h.length>60)h.shift();n++;}}});
@@ -754,16 +790,16 @@ function manage(id){
   var hist=S.hist[c.cid]||[];
   d.innerHTML='<div style="max-height:88vh;overflow:auto"><img src="'+esc(c.large||c.small)+'" alt="" onerror="this.style.display=\'none\'" style="max-height:46vh;object-fit:contain">'+
    '<b style="display:block;margin-top:8px;font-size:17px">'+esc(c.name)+'</b><div class="note">'+esc(c.set)+(c.num?' · #'+esc(c.num)+(c.setPrinted?'/'+c.setPrinted:''):'')+(c.rarity?' · '+esc(c.rarity):'')+(c.types?' · '+esc(c.types):'')+'</div>'+
-   '<div class="note">'+esc(c.owner)+' · '+esc(c.cond)+(fin(c)!=="std"?' · '+FIN[fin(c)].toLowerCase():'')+'</div>'+
+   '<div class="note">'+esc(c.owner)+' · '+esc(c.cond)+(fin(c)!=="std"?' · '+FIN[fin(c)].toLowerCase():'')+'</div><div id="mrar">'+rarityBlock(c)+'</div>'+
    '<div style="display:flex;align-items:baseline;gap:10px;margin:8px 0 0"><span style="font-size:24px;font-weight:700" id="mpv">'+(c.price?money(c.price):'—')+'</span><span class="note" id="mpn">'+(c.price?'current value each'+(c.qty>1?' · '+money(c.price*c.qty)+' total':''):'checking price…')+'</span></div>'+
    '<div class="note" id="mpsrc">'+(c.price&&c.psrc?'Source: '+esc(c.psrc):'')+'</div><div id="mspark">'+dlgSpark(hist)+'</div><div id="minfo" class="note">Loading details…</div>'+
    (function(){var sib=S.cards.filter(function(x){return x.id!==c.id&&x.cid===c.cid&&x.owner===c.owner&&x.cond===c.cond;});if(!sib.length)return '';return '<div class="row" style="margin:8px 0 0"><span class="note">Also own:</span>'+sib.map(function(x){return '<button class="btn alt sm" data-sib="'+x.id+'">'+FIN[fin(x)]+' ×'+x.qty+'</button>';}).join("")+'</div>';})()+
    '<div class="row" id="mqrow" style="margin:12px 0 8px"><button class="btn alt" id="mdn">−</button><b style="min-width:60px;text-align:center">×'+c.qty+'</b><button class="btn alt" id="mup">+</button>'+
    '<button class="btn '+(c.trade?'on':'alt')+'" id="mtr">⇄ For trade</button></div>'+
-   '<div class="row" style="margin:0 0 8px;flex-wrap:wrap"><span class="note">Finish: <b>'+FIN[fin(c)]+'</b></span>'+(c.qty>1?'<select id="mfn" style="width:auto;padding:6px 8px">'+Array.apply(null,Array(c.qty)).map(function(_,i){return '<option value="'+(i+1)+'">'+(i+1)+'</option>';}).join("")+'</select>':'')+'<span class="note">→</span><select id="mft" style="width:auto;padding:6px 8px">'+["std","holo","rev"].filter(function(k){return k!==fin(c);}).map(function(k){return '<option value="'+k+'">'+FIN[k]+'</option>';}).join("")+'</select><button class="btn alt sm" id="mfin">Change</button></div>'+
+   '<div class="row" style="margin:0 0 8px;flex-wrap:wrap"><span class="note">Finish: <b>'+FIN[fin(c)]+'</b></span>'+(c.qty>1?'<select id="mfn" style="width:auto;padding:6px 8px">'+Array.apply(null,Array(c.qty)).map(function(_,i){return '<option value="'+(i+1)+'">'+(i+1)+'</option>';}).join("")+'</select>':'')+'<span class="note">→</span><select id="mft" style="width:auto;padding:6px 8px">'+finOpts(c).filter(function(k){return k!==fin(c);}).map(function(k){return '<option value="'+k+'">'+FIN[k]+'</option>';}).join("")+'</select><button class="btn alt sm" id="mfin">Change</button></div>'+
    '<div class="row" style="margin:0"><button class="btn alt" id="mcl">Close</button><button class="btn bad" id="mrm">Remove</button></div></div>';
   if(c.cid&&c.cid.indexOf("manual-")!==0){
-    var show=function(j){var el=$("minfo");if(!el||!d.open)return;el.className="";el.innerHTML=infoHtml(c,j);if(!(j&&anyPrice(j,fin(c)))&&$("mpn")&&!c.price)$("mpn").textContent="no market price listed";
+    var show=function(j){var el=$("minfo");if(!el||!d.open)return;var ff=finsOf(j);if(ff.length){c.fins=ff;save();var rb=$("mrar");if(rb){rb.innerHTML=rarityBlock(c);wireRG();}}el.className="";el.innerHTML=infoHtml(c,j);if(!(j&&anyPrice(j,fin(c)))&&$("mpn")&&!c.price)$("mpn").textContent="no market price listed";
       var pi=j&&priceInfo(j,fin(c),j&&j._site||"");var np=pi&&pi.v;if(!np&&j&&j._exact&&c.price){c.price=0;c.psrc="";save();if($("mpv"))$("mpv").textContent="—";if($("mpn"))$("mpn").textContent="no market price listed";if($("mpsrc"))$("mpsrc").textContent="";}
       if(np){c.price=np;c.psrc=pi.src;if($("mpsrc"))$("mpsrc").textContent="Source: "+pi.src;var h=S.hist[c.cid]||(S.hist[c.cid]=[]);var last=h[h.length-1];if(!last||Date.now()-last[0]>3600000){h.push([Date.now(),np]);if(h.length>60)h.shift();}save();
         if($("mpv"))$("mpv").textContent=money(np);if($("mpn"))$("mpn").textContent="current value each"+(c.qty>1?" · "+money(np*c.qty)+" total":"");if($("mspark"))$("mspark").innerHTML=dlgSpark(S.hist[c.cid]);}};
@@ -771,12 +807,12 @@ function manage(id){
     fetchInfo(c).then(function(j){c.info=j;show(j);}).catch(function(e){var el=$("minfo");if(el&&!c.info)el.textContent="Couldn't load live details ("+(e&&e.message||"network")+"). Try again in a moment.";if($("mpn")&&!c.price)$("mpn").textContent="price unavailable right now";});
   }else $("minfo").textContent="Manually added card.";
   if(!d.open)d.showModal();
+  function wireRG(){var a=$("mrg");if(a)a.onclick=function(e){e.preventDefault();rarityGuide();};}wireRG();
   $("mcl").onclick=function(){d.close();};
   $("mup").onclick=function(){buzz();
-    $("mqrow").innerHTML='<span class="note">Add one:</span><button class="btn alt" id="mps">Standard</button><button class="btn alt" id="mph">Holo</button><button class="btn alt" id="mpr">Reverse</button><button class="btn alt sm" id="mpc">Cancel</button>';
-    $("mps").onclick=function(){addCopies(c,1,"std");save();render();manage(id);};
-    $("mph").onclick=function(){addCopies(c,1,"holo");save();render();manage(id);};
-    $("mpr").onclick=function(){addCopies(c,1,"rev");save();render();manage(id);};
+    var fo=finOpts(c);
+    $("mqrow").innerHTML='<span class="note">Add one:</span>'+fo.map(function(k){return '<button class="btn alt" data-addf="'+k+'">'+FIN[k]+'</button>';}).join("")+'<button class="btn alt sm" id="mpc">Cancel</button>';
+    Array.prototype.forEach.call($("mqrow").querySelectorAll("[data-addf]"),function(b){b.onclick=function(){addCopies(c,1,b.dataset.addf);save();render();manage(id);};});
     $("mpc").onclick=function(){manage(id);};
   };
   $("mfin").onclick=function(){buzz();var n=$("mfn")?+$("mfn").value:1;var t=moveFinish(c,n,$("mft").value);render();manage(t.id);if(!t.info)refreshPrices(true);};
@@ -921,7 +957,7 @@ function viewCol(){
         var c=e&&e.c;
         if(c){
           var ty=String(c.types||"").split("/")[0];if(ty)tc[ty]=(tc[ty]||0)+1;
-          var rr=c.rarity||"",holo=!!(e.foil||c.foil)||/holo|double|ultra|illustration|hyper|secret|ace|radiant|amazing|vmax|vstar|\bex\b|shiny|special|rainbow|gold/i.test(rr),shine=holo||(rr&&!/^(common|uncommon)$/i.test(rr));
+          var rr=c.rarity||"",known=c.fins&&c.fins.length,holo=!!(e.foil||c.foil)||(known?(c.fins.indexOf("std")<0&&c.fins.indexOf("holo")>-1):/holo|double|ultra|illustration|hyper|secret|ace|radiant|amazing|vmax|vstar|\bex\b|shiny|special|rainbow|gold/i.test(rr)),shine=holo||(rr&&!/^(common|uncommon)$/i.test(rr));
           var isB=pg.printed&&parseInt(pg.nums[idx],10)>pg.printed;
           slots+='<div class="slot'+(shine?' shine':'')+(holo?' holo':'')+(isB?' bonus':'')+'" data-a="manage" data-i="'+c.id+'">'+(isB?'<span class="bstar">★</span>':'')+'<span class="sn">'+esc(c.name)+'</span>'+(c.small?'<img loading="lazy" src="'+esc(c.small)+'" alt="'+esc(c.name)+'" data-a="manage" data-i="'+c.id+'">':'<span class="sn" data-a="manage" data-i="'+c.id+'"></span>')+(e.qty>1?'<span class="qb">×'+e.qty+'</span>':'')+(e.trade?'<span class="tb">⇄</span>':'')+'</div>';
         }else slots+='<div class="slot empty'+(pg.printed&&parseInt(pg.nums[idx],10)>pg.printed?' bonus':'')+'"'+(pg.nums[idx]&&pg.setId?' data-a="blank" data-set="'+esc(pg.setId)+'" data-n="'+pg.nums[idx]+'"':'')+'>'+(pg.nums[idx]?'<span class="en">'+(pg.printed&&parseInt(pg.nums[idx],10)>pg.printed?'★ ':'')+'#'+pg.nums[idx]+'</span>':'')+'</div>';
