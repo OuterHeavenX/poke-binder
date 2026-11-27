@@ -45,6 +45,19 @@ main.binder{padding:6px 6px 8px}
 .tb2{display:flex;align-items:center;gap:5px;margin-bottom:5px}
 .tb2 .btn.sm{padding:5px 9px}
 .tb2 .ttl{flex:1;text-align:center;font-size:13px;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+/* immersive + spread */
+.spread{display:flex;gap:6px;position:relative}.spread .side{flex:1;min-width:0}.spread::after{content:"";position:absolute;left:50%;top:8px;bottom:8px;width:2px;margin-left:-1px;background:linear-gradient(180deg,transparent,#0009,transparent);pointer-events:none}
+#immh{display:none}
+html.imm header{position:fixed;left:0;right:0;top:0;z-index:20;transform:translateY(-105%);transition:transform .25s;box-shadow:0 8px 24px #000a}
+html.imm.chrome header{transform:none}
+html.imm .ctop{position:fixed;left:0;right:0;top:var(--hh,96px);z-index:19;padding:8px 10px 4px;background:var(--bg);border-bottom:1px solid var(--line);opacity:0;pointer-events:none;transform:translateY(-14px);transition:opacity .25s,transform .25s}
+html.imm.chrome .ctop{opacity:1;pointer-events:auto;transform:none}
+html.imm .ctop .tb2{margin-bottom:4px}
+html.imm .bfoot{position:fixed;left:0;right:0;bottom:0;z-index:19;background:var(--bg);padding:8px 12px calc(8px + env(safe-area-inset-bottom));border-top:1px solid var(--line);transform:translateY(105%);transition:transform .25s}
+html.imm.chrome .bfoot{transform:none}
+html.imm body{padding-bottom:0}
+html.imm main.binder{padding:max(4px,env(safe-area-inset-top)) 4px calc(4px + env(safe-area-inset-bottom))}
+html.imm:not(.chrome) #immh{display:block;position:fixed;top:calc(env(safe-area-inset-top) + 3px);left:50%;transform:translateX(-50%);z-index:21;width:72px;height:26px;line-height:24px;text-align:center;border-radius:13px;background:var(--card2);color:var(--mut);font-size:14px;opacity:.55;cursor:pointer}
 /* binder page juice */
 .bg .slot{aspect-ratio:auto}
 .bpage{position:relative;border-radius:14px;padding:3px;background:linear-gradient(180deg,var(--acc-a,#3b82f626),transparent 72%)}
@@ -124,6 +137,7 @@ svg.spark{width:100%;height:80px;background:var(--card);border:1px solid var(--l
 </style>
 </head>
 <body>
+<div id="immh">☰</div>
 <header>
   <div class="hrow"><h1><i></i>Poké Binder</h1><span class="hs" id="hs"></span><small id="ver" style="flex:none;font-size:11px;color:var(--mut);cursor:pointer"></small></div>
   <nav id="nav">
@@ -144,7 +158,7 @@ svg.spark{width:100%;height:80px;background:var(--card);border:1px solid var(--l
 <script>
 (function(){
 "use strict";
-var VERSION="1.15.0",BUILD="2026-11-09";
+var VERSION="1.16.0",BUILD="2026-11-09";
 var KEY="pokebinder.v1";
 var API="https://api.pokemontcg.io/v2/cards";
 var SETS_API="https://api.pokemontcg.io/v2/sets";
@@ -845,6 +859,19 @@ function binderPages(list,N){
   if(!pages.length){var e=[];for(var z=0;z<N;z++)e.push(null);pages.push({name:"",setId:"",slots:e,nums:e.map(function(){return "";}),range:""});}
   return pages;
 }
+function tabletish(){return Math.min(window.innerWidth||0,window.innerHeight||0)>=480;}
+function spreadOn(){return S.settings.spread!==false&&tabletish()&&(window.innerWidth||0)>(window.innerHeight||0);}
+var chT=0,lastSpread=null;
+function isChrome(){return document.documentElement.classList.contains("chrome");}
+function setChrome(on){var d=document.documentElement;d.classList.toggle("chrome",!!on);clearTimeout(chT);
+  if(on)chT=setTimeout(function(){var ae=document.activeElement;if(ae&&/^(INPUT|SELECT)$/.test(ae.tagName)){setChrome(true);return;}setChrome(false);setTimeout(fitBinder,0);},5000);}
+function applyImm(){
+  var d=document.documentElement,on=S.settings.immerse!==false&&tabletish()&&S.tab==="col"&&S.view==="binder"&&S.shelf===false&&!!S.cards.length;
+  var was=d.classList.contains("imm");d.classList.toggle("imm",on);
+  if(!on){d.classList.remove("chrome");clearTimeout(chT);}else if(!was)d.classList.remove("chrome");
+  var h=document.querySelector("header");if(h)d.style.setProperty("--hh",h.offsetHeight+"px");
+}
+function turn(d){if(!spreadOn()){S.page+=d;return;}if(d>0)S.page=S.page===0?1:S.page+2;else S.page=S.page<=1?0:S.page-2;}
 function layoutOf(){var p=String(S.settings.layout||"3x3").split("x");return {c:parseInt(p[0],10)||3,r:parseInt(p[1],10)||3};}
 function filterRow(withToggle){
   var f=S.filter;
@@ -883,28 +910,43 @@ function viewCol(){
   if(S.view==="binder"){
     var L=layoutOf(),N=L.c*L.r,pages=binderPages(list,N);
     if(S.page>=pages.length)S.page=pages.length-1;if(S.page<0)S.page=0;
-    var pg=pages[S.page],slots="",tc={};
-    var TYPECOL={Grass:"#4ade80",Fire:"#f87171",Water:"#60a5fa",Lightning:"#facc15",Psychic:"#c084fc",Fighting:"#fb923c",Darkness:"#94a3b8",Metal:"#cbd5e1",Dragon:"#fbbf24",Fairy:"#f9a8d4",Colorless:"#e5e7eb"};
-    pg.slots.forEach(function(e,idx){
-      var c=e&&e.c;
-      if(c){
-        var ty=String(c.types||"").split("/")[0];if(ty)tc[ty]=(tc[ty]||0)+1;
-        var rr=c.rarity||"",holo=!!(e.foil||c.foil)||/holo|double|ultra|illustration|hyper|secret|ace|radiant|amazing|vmax|vstar|\bex\b|shiny|special|rainbow|gold/i.test(rr),shine=holo||(rr&&!/^(common|uncommon)$/i.test(rr));
-        var isB=pg.printed&&parseInt(pg.nums[idx],10)>pg.printed;
-        slots+='<div class="slot'+(shine?' shine':'')+(holo?' holo':'')+(isB?' bonus':'')+'" data-a="manage" data-i="'+c.id+'">'+(isB?'<span class="bstar">★</span>':'')+'<span class="sn">'+esc(c.name)+'</span>'+(c.small?'<img loading="lazy" src="'+esc(c.small)+'" alt="'+esc(c.name)+'" data-a="manage" data-i="'+c.id+'">':'<span class="sn" data-a="manage" data-i="'+c.id+'"></span>')+(e.qty>1?'<span class="qb">×'+e.qty+'</span>':'')+(e.trade?'<span class="tb">⇄</span>':'')+'</div>';
-      }else slots+='<div class="slot empty'+(pg.printed&&parseInt(pg.nums[idx],10)>pg.printed?' bonus':'')+'"'+(pg.nums[idx]&&pg.setId?' data-a="blank" data-set="'+esc(pg.setId)+'" data-n="'+pg.nums[idx]+'"':'')+'>'+(pg.nums[idx]?'<span class="en">'+(pg.printed&&parseInt(pg.nums[idx],10)>pg.printed?'★ ':'')+'#'+pg.nums[idx]+'</span>':'')+'</div>';
-    });
-    var top=Object.keys(tc).sort(function(a,b){return tc[b]-tc[a];})[0],acc=TYPECOL[top]||"#3b82f6";
+    var two=spreadOn();lastSpread=two;
+    if(two&&S.page>0&&S.page%2===0)S.page--;
+    var idxs=[S.page];if(two&&S.page>0&&S.page+1<pages.length)idxs.push(S.page+1);
     var fc=S.flip||"";S.flip="";
-    S.curPage={name:pg.name,range:pg.range,page:S.page+1,total:pages.length,slots:pg.slots,nums:pg.nums,acc:acc,cols:L.c,rows:L.r};
-    var bar='<div class="tb2"><button class="btn alt sm" data-a="shelf" title="All binders">▦</button><button class="btn alt sm" data-a="pgprev"'+(S.page===0?' disabled':'')+'>‹</button><div class="ttl"><b>'+esc(pg.name)+'</b>'+(pg.range?' · '+(pg.type==="check"?'':'#')+pg.range:'')+' · '+(S.page+1)+'/'+pages.length+'</div><button class="btn alt sm" data-a="pgnext"'+(S.page>=pages.length-1?' disabled':'')+'>›</button><button class="btn sm '+(S.showFilter?"on":"alt")+'" data-a="tfilter">🔍</button><button class="btn alt sm" data-a="sharepg" title="Share this page">📤</button><button class="btn alt sm" data-a="vlist">List</button></div>';
-    if(pg.type==="check"){S.curPage=null;return bar+(S.showFilter?filterRow(false):"")+'<div class="bpage" style="--acc:'+acc+';--acc-a:'+acc+'2e">'+checklistHtml(pg)+'</div>'+
-      '<div class="bfoot" id="bfoot">'+(pg.setSize?'<div class="bar" style="margin:0 0 4px"><span style="width:auto">'+pg.owned+' / '+pg.setSize+'</span><div class="track"><div style="width:'+Math.min(100,pg.owned/pg.setSize*100)+'%"></div></div><span style="width:auto">'+Math.round(pg.owned/pg.setSize*100)+'%</span></div>':'')+
-      (pages.length>1?'<input type="range" id="pgslide" min="0" max="'+(pages.length-1)+'" value="'+S.page+'" style="width:100%;padding:0">':'')+'</div>';}
-    return bar+(S.showFilter?filterRow(false):"")+'<div class="bpage '+fc+'" style="--acc:'+acc+';--acc-a:'+acc+'2e">'+(pg.setId?'<img class="wm" src="https://images.pokemontcg.io/'+esc(pg.setId)+'/logo.png" alt="" onerror="this.remove()" onload="if(this.naturalWidth<this.naturalHeight*1.2)this.remove()">':'')+'<div class="bg" id="bgrid" data-c="'+L.c+'" data-r="'+L.r+'" style="grid-template-columns:repeat('+L.c+',1fr)">'+slots+'</div></div>'+
-      '<div class="bfoot" id="bfoot">'+(pg.setSize?'<div class="bar" style="margin:0 0 4px"><span style="width:auto">'+pg.owned+' / '+pg.setSize+'</span><div class="track"><div style="width:'+Math.min(100,pg.owned/pg.setSize*100)+'%"></div></div><span style="width:auto">'+Math.round(pg.owned/pg.setSize*100)+'%</span></div>':'')+
-      (pg.printed&&(pg.bonusOwned||pg.bonusKnown||/★/.test(slots))?'<div class="note bnote">★ Bonus cards (numbered past the set\'s '+pg.printed+'): you have '+pg.bonusOwned+(pg.bonusKnown?' of '+pg.bonusKnown+' listed':'')+'</div>':'')+
+    var TYPECOL={Grass:"#4ade80",Fire:"#f87171",Water:"#60a5fa",Lightning:"#facc15",Psychic:"#c084fc",Fighting:"#fb923c",Darkness:"#94a3b8",Metal:"#cbd5e1",Dragon:"#fbbf24",Fairy:"#f9a8d4",Colorless:"#e5e7eb"};
+    var blocks=idxs.map(function(pi,k){
+      var pg=pages[pi],slots="",tc={};
+      pg.slots.forEach(function(e,idx){
+        var c=e&&e.c;
+        if(c){
+          var ty=String(c.types||"").split("/")[0];if(ty)tc[ty]=(tc[ty]||0)+1;
+          var rr=c.rarity||"",holo=!!(e.foil||c.foil)||/holo|double|ultra|illustration|hyper|secret|ace|radiant|amazing|vmax|vstar|\bex\b|shiny|special|rainbow|gold/i.test(rr),shine=holo||(rr&&!/^(common|uncommon)$/i.test(rr));
+          var isB=pg.printed&&parseInt(pg.nums[idx],10)>pg.printed;
+          slots+='<div class="slot'+(shine?' shine':'')+(holo?' holo':'')+(isB?' bonus':'')+'" data-a="manage" data-i="'+c.id+'">'+(isB?'<span class="bstar">★</span>':'')+'<span class="sn">'+esc(c.name)+'</span>'+(c.small?'<img loading="lazy" src="'+esc(c.small)+'" alt="'+esc(c.name)+'" data-a="manage" data-i="'+c.id+'">':'<span class="sn" data-a="manage" data-i="'+c.id+'"></span>')+(e.qty>1?'<span class="qb">×'+e.qty+'</span>':'')+(e.trade?'<span class="tb">⇄</span>':'')+'</div>';
+        }else slots+='<div class="slot empty'+(pg.printed&&parseInt(pg.nums[idx],10)>pg.printed?' bonus':'')+'"'+(pg.nums[idx]&&pg.setId?' data-a="blank" data-set="'+esc(pg.setId)+'" data-n="'+pg.nums[idx]+'"':'')+'>'+(pg.nums[idx]?'<span class="en">'+(pg.printed&&parseInt(pg.nums[idx],10)>pg.printed?'★ ':'')+'#'+pg.nums[idx]+'</span>':'')+'</div>';
+      });
+      var top=Object.keys(tc).sort(function(a,b){return tc[b]-tc[a];})[0],acc=TYPECOL[top]||"#3b82f6";
+      var html;
+      if(pg.type==="check")html='<div class="bpage '+fc+'" style="--acc:'+acc+';--acc-a:'+acc+'2e">'+checklistHtml(pg)+'</div>';
+      else html='<div class="bpage '+fc+'" style="--acc:'+acc+';--acc-a:'+acc+'2e">'+(pg.setId?'<img class="wm" src="https://images.pokemontcg.io/'+esc(pg.setId)+'/logo.png" alt="" onerror="this.remove()" onload="if(this.naturalWidth<this.naturalHeight*1.2)this.remove()">':'')+'<div class="bg" id="'+(k?'bgrid2':'bgrid')+'" data-c="'+L.c+'" data-r="'+L.r+'" style="grid-template-columns:repeat('+L.c+',1fr)">'+slots+'</div></div>';
+      return {pg:pg,pi:pi,slots:slots,acc:acc,html:html,cur:pg.type==="check"?null:{name:pg.name,range:pg.range,page:pi+1,total:pages.length,slots:pg.slots,nums:pg.nums,acc:acc,cols:L.c,rows:L.r}};
+    });
+    var B0=blocks[0],pg=B0.pg,slots=B0.slots;
+    S.curPage=B0.cur||(blocks[1]&&blocks[1].cur)||null;
+    var ttl;
+    if(two){var B1=blocks[1];
+      ttl='<b>'+esc(pg.name)+'</b>'+(B1&&B1.pg.name!==pg.name?' / <b>'+esc(B1.pg.name)+'</b>':'')+' · '+(S.page+1)+(B1?'–'+(B1.pi+1):'')+'/'+pages.length;}
+    else ttl='<b>'+esc(pg.name)+'</b>'+(pg.range?' · '+(pg.type==="check"?'':'#')+pg.range:'')+' · '+(S.page+1)+'/'+pages.length;
+    var atEnd=two?(S.page===0?pages.length<=1:S.page+2>=pages.length):S.page>=pages.length-1;
+    var bar='<div class="tb2"><button class="btn alt sm" data-a="shelf" title="All binders">▦</button><button class="btn alt sm" data-a="pgprev"'+(S.page===0?' disabled':'')+'>‹</button><div class="ttl">'+ttl+'</div><button class="btn alt sm" data-a="pgnext"'+(atEnd?' disabled':'')+'>›</button><button class="btn sm '+(S.showFilter?"on":"alt")+'" data-a="tfilter">🔍</button><button class="btn alt sm" data-a="sharepg" title="Share this page">📤</button><button class="btn alt sm" data-a="vlist">List</button></div>';
+    var body;
+    if(two){body='<div class="spread">'+(S.page===0?'<div class="side"></div><div class="side">'+B0.html+'</div>':'<div class="side">'+B0.html+'</div><div class="side">'+(blocks[1]?blocks[1].html:'')+'</div>')+'</div>';}
+    else body=B0.html;
+    var foot='<div class="bfoot" id="bfoot">'+(pg.setSize?'<div class="bar" style="margin:0 0 4px"><span style="width:auto">'+pg.owned+' / '+pg.setSize+'</span><div class="track"><div style="width:'+Math.min(100,pg.owned/pg.setSize*100)+'%"></div></div><span style="width:auto">'+Math.round(pg.owned/pg.setSize*100)+'%</span></div>':'')+
+      (pg.type!=="check"&&pg.printed&&(pg.bonusOwned||pg.bonusKnown||/★/.test(slots))?'<div class="note bnote">★ Bonus cards (numbered past the set\'s '+pg.printed+'): you have '+pg.bonusOwned+(pg.bonusKnown?' of '+pg.bonusKnown+' listed':'')+'</div>':'')+
       (pages.length>1?'<input type="range" id="pgslide" min="0" max="'+(pages.length-1)+'" value="'+S.page+'" style="width:100%;padding:0">':'')+'</div>';
+    return '<div class="ctop">'+bar+(S.showFilter?filterRow(false):"")+'</div>'+body+foot;
   }
   list.sort(function(a,b){
     if(f.sort==="name")return a.name.localeCompare(b.name);
@@ -917,15 +959,18 @@ function viewCol(){
   return h+'<div class="grid">'+list.map(function(c){return cardTile(c,"col");}).join("")+"</div>";
 }
 function fitBinder(){
-  var cl=$("clist");if(cl){var ft=$("bfoot"),tp=cl.getBoundingClientRect().top;cl.style.maxHeight=Math.max(160,(window.innerHeight||600)-tp-(ft?ft.offsetHeight+10:10)-(parseFloat(getComputedStyle(document.body).paddingBottom)||0))+"px";return;}
-  var g=$("bgrid");if(!g)return;
-  var c=+g.dataset.c,r=+g.dataset.r,gap=6,ratio=245/342;
-  var top=g.getBoundingClientRect().top+(window.pageYOffset||0);
+  var imm=document.documentElement.classList.contains("imm"),ft=$("bfoot"),vh=window.innerHeight||600;
   var sb=parseFloat(getComputedStyle(document.body).paddingBottom)||0;
-  var ft=$("bfoot");var avail=(window.innerHeight||600)-top-10-sb-(ft?ft.offsetHeight+6:0);
-  var wW=(g.clientWidth-gap*(c-1))/c,wH=((avail-gap*(r-1))/r)*ratio;
-  var w=Math.floor(Math.max(48,Math.min(wW,wH))),h=Math.round(w/ratio);
-  g.style.gridTemplateColumns="repeat("+c+","+w+"px)";g.style.gridAutoRows=h+"px";g.style.justifyContent="center";
+  var mb=parseFloat(getComputedStyle($("main")).paddingBottom)||0;
+  var cl=$("clist");
+  if(cl){var tp=cl.getBoundingClientRect().top;cl.style.maxHeight=Math.max(160,vh-tp-(imm?mb+6:(ft?ft.offsetHeight+10:10)+sb))+"px";}
+  var gs=Array.prototype.slice.call(document.querySelectorAll("#main .bg"));if(!gs.length)return;
+  var g0=gs[0],c=+g0.dataset.c,r=+g0.dataset.r,gap=6,ratio=245/342;
+  var top=g0.getBoundingClientRect().top+(window.pageYOffset||0);
+  var avail=imm?vh-top-mb-4:vh-top-10-sb-(ft?ft.offsetHeight+6:0);
+  var w=1e9;gs.forEach(function(g){var wW=(g.clientWidth-gap*(c-1))/c,wH=((avail-gap*(r-1))/r)*ratio;w=Math.min(w,wW,wH);});
+  w=Math.floor(Math.max(48,w));var h=Math.round(w/ratio);
+  gs.forEach(function(g){g.style.gridTemplateColumns="repeat("+c+","+w+"px)";g.style.gridAutoRows=h+"px";g.style.justifyContent="center";});
 }
 
 function viewAdd(){
@@ -1043,7 +1088,7 @@ function viewData(){
   return '<h3 style="margin-top:0">About</h3><div class="li"><div class="g"><b>Poké Binder</b> v'+VERSION+'<div class="note">Build '+BUILD+'</div><div class="note">'+esc(S.updStatus)+'</div></div><div class="acts" style="flex-direction:column;align-items:stretch"><button class="btn sm" data-a="chkupd">Check for updates</button>'+(S.latest&&S.latest!==VERSION?'<button class="btn good sm" data-a="doupdate">Update to v'+esc(S.latest)+'</button>':'')+'</div></div>'+
    '<h3>Binder</h3><div class="f"><label>Pockets per page<select id="setlay">'+opts([["3x3","3 × 3 (9 pockets)"],["4x3","4 × 3 (12 pockets)"],["2x2","2 × 2 (4 pockets)"],["3x4","3 × 4 (12 pockets)"]],st.layout)+'</select></label>'+
    '<div class="two"><label>Default owner<select id="setown">'+opts(OWNERS.map(function(o){return [o,o];}),st.owner)+'</select></label><label>Default condition<select id="setcnd">'+opts(CONDS.map(function(o){return [o,o];}),st.cond)+'</select></label></div></div>'+
-   '<h3>Look &amp; feel</h3><div class="f"><div class="two"><label>Theme<select id="settheme">'+opts([["auto","Match my phone"],["dark","Dark"],["light","Light"]],st.theme)+'</select></label><label>Haptics<select id="sethap">'+opts([["1","On"],["0","Off"]],st.haptics?"1":"0")+'</select></label></div><label>Show every pocket of a set (so you can tap any blank)<select id="setfull">'+opts([["1","On"],["0","Off (only up to my last card)"]],st.fullSets!==false?"1":"0")+'</select></label><label>Title in the phone\'s status-bar strip (turn off if it covers your clock)<select id="setstrip">'+opts([["1","On"],["0","Off"]],st.strip!==false?"1":"0")+'</select></label><label>Auto-refresh prices once a day<select id="setauto">'+opts([["1","On"],["0","Off"]],st.autoPrices?"1":"0")+'</select></label></div>'+
+   '<h3>Look &amp; feel</h3><div class="f"><div class="two"><label>Theme<select id="settheme">'+opts([["auto","Match my phone"],["dark","Dark"],["light","Light"]],st.theme)+'</select></label><label>Haptics<select id="sethap">'+opts([["1","On"],["0","Off"]],st.haptics?"1":"0")+'</select></label></div><label>Show every pocket of a set (so you can tap any blank)<select id="setfull">'+opts([["1","On"],["0","Off (only up to my last card)"]],st.fullSets!==false?"1":"0")+'</select></label><label>Title in the phone\'s status-bar strip (turn off if it covers your clock)<select id="setstrip">'+opts([["1","On"],["0","Off"]],st.strip!==false?"1":"0")+'</select></label><label>Hide the menus while viewing a binder page (tablets / Duo; tap the middle or ☰ to show)<select id="setimm">'+opts([["1","On"],["0","Off"]],st.immerse!==false?"1":"0")+'</select></label><label>Two-page spread when held sideways (tablets / Duo)<select id="setspread">'+opts([["1","On"],["0","Off"]],st.spread!==false?"1":"0")+'</select></label><label>Auto-refresh prices once a day<select id="setauto">'+opts([["1","On"],["0","Off"]],st.autoPrices?"1":"0")+'</select></label></div>'+
    '<h3>Backup</h3><p class="note">Your collection is saved on this device only. Export a backup now and then; it also moves your collection to another phone.</p>'+
    '<div class="row"><button class="btn" id="ej">Export backup (.json)</button><button class="btn alt" id="ec">Export spreadsheet (.csv)</button><label class="btn alt" style="cursor:pointer">Import backup<input id="im" type="file" accept=".json,application/json" hidden></label></div>'+
    '<h3>Card database key (optional)</h3><p class="note">Works without one. A free key from dev.pokemontcg.io can make searches more reliable.</p><div class="row"><input type="text" id="ak" placeholder="API key (optional)" value="'+esc(S.apikey)+'"><button class="btn alt" id="aks">Save key</button></div>'+
@@ -1078,7 +1123,7 @@ function valueList(scope){
   Array.prototype.forEach.call(d.querySelectorAll(".vrow"),function(el){el.onclick=function(){manage(el.dataset.vid);};});
 }
 function updHdr(){var el=$("hs");if(!el)return;var n=0,v=0;S.cards.forEach(function(c){n+=c.qty;v+=(c.price||0)*c.qty;});el.innerHTML='<b>'+n+'</b> cards'+' · <b>'+money(v)+'</b>';}
-function render(){applyStrip();updHdr();
+function render(){applyStrip();applyImm();updHdr();
   Array.prototype.forEach.call($("nav").children,function(b){b.classList.toggle("on",b.dataset.t===S.tab);});
   var ae=document.activeElement,keep=ae&&ae.id,pos=ae&&ae.selectionStart;
   var v=({col:viewCol,add:viewAdd,sets:viewSets,wish:viewWish,trade:viewTrade,packs:viewPacks,stats:viewStats,data:viewData})[S.tab]();
@@ -1111,6 +1156,8 @@ function wire(){
   if($("setlay"))$("setlay").onchange=function(){S.settings.layout=this.value;S.page=0;save();toast("Binder layout saved");};
   if($("settheme"))$("settheme").onchange=function(){S.settings.theme=this.value;save();applyTheme();};
   if($("sethap"))$("sethap").onchange=function(){S.settings.haptics=this.value==="1";save();buzz();};
+  if($("setimm"))$("setimm").onchange=function(){S.settings.immerse=this.value==="1";save();render();};
+  if($("setspread"))$("setspread").onchange=function(){S.settings.spread=this.value==="1";save();render();};
   if($("setstrip"))$("setstrip").onchange=function(){S.settings.strip=this.value==="1";save();applyStrip();};
   if($("setfull"))$("setfull").onchange=function(){S.settings.fullSets=this.value==="1";S.page=0;save();};
   if($("setauto"))$("setauto").onchange=function(){S.settings.autoPrices=this.value==="1";save();};
@@ -1118,10 +1165,10 @@ function wire(){
   if($("setown"))$("setown").onchange=function(){S.settings.owner=this.value;save();};
   if($("setcnd"))$("setcnd").onchange=function(){S.settings.cond=this.value;save();};
   if($("pgslide")){$("pgslide").onchange=function(){S.page=+this.value;buzz();render();};}
-  var bg=$("bgrid");
-  if(bg){var x0=null,y0=0;
-    bg.ontouchstart=function(e){x0=e.touches[0].clientX;y0=e.touches[0].clientY;};
-    bg.ontouchend=function(e){if(x0==null)return;var dx=e.changedTouches[0].clientX-x0,dy=e.changedTouches[0].clientY-y0;x0=null;if(Math.abs(dx)>60&&Math.abs(dx)>Math.abs(dy)*1.5){buzz();S.page+=dx<0?1:-1;S.flip=dx<0?"fr":"fl";render();}};}
+  var mn=$("main");
+  if(!mn._sw){mn._sw=1;var x0=null,y0=0;
+    mn.addEventListener("touchstart",function(e){x0=e.touches.length===1?e.touches[0].clientX:null;y0=e.touches[0].clientY;},{passive:true});
+    mn.addEventListener("touchend",function(e){if(x0==null||!document.querySelector("#main .bg"))return;var dx=e.changedTouches[0].clientX-x0,dy=e.changedTouches[0].clientY-y0;x0=null;if(Math.abs(dx)>60&&Math.abs(dx)>Math.abs(dy)*1.5){buzz();turn(dx<0?1:-1);S.flip=dx<0?"fr":"fl";render();}},{passive:true});}
   if($("aks"))$("aks").onclick=function(){S.apikey=$("ak").value.trim();save();toast("Saved");};
 }
 function checkUpdate(manual){
@@ -1186,8 +1233,8 @@ $("main").onclick=function(e){
   else if(a==="wipe"){if(confirm("Erase ALL cards, wishlist, packs and price history on this device?")&&confirm("Really erase everything? Export a backup first if unsure.")){S.cards=[];S.wish=[];S.hist={};S.vhist=[];S.packs=[];S.page=0;save();toast("Erased");render();}}
   else if(a==="vbinder"){S.view="binder";save();render();}
   else if(a==="vlist"){S.view="list";save();render();}
-  else if(a==="pgprev"){buzz();S.page--;S.flip="fl";render();window.scrollTo(0,0);}
-  else if(a==="pgnext"){buzz();S.page++;S.flip="fr";render();window.scrollTo(0,0);}
+  else if(a==="pgprev"){buzz();turn(-1);S.flip="fl";render();window.scrollTo(0,0);}
+  else if(a==="pgnext"){buzz();turn(1);S.flip="fr";render();window.scrollTo(0,0);}
   else if(a==="bclear"){S.batch=null;render();}
   else if(a==="adjcancel"){closeAdjust();render();}
   else if(a==="adjprev"){S.adjust.idx--;render();}
@@ -1209,7 +1256,15 @@ $("main").onclick=function(e){
 load();applyTheme();render();
 if(window.matchMedia)try{window.matchMedia("(prefers-color-scheme: light)").addEventListener("change",applyTheme);}catch(e){}
 $("hs").style.cursor="pointer";$("hs").onclick=function(){buzz();valueList();};$("ver").textContent="v"+VERSION;$("ver2").textContent="v"+VERSION;$("ver2").onclick=function(){S.tab="data";render();};$("ver").onclick=function(){S.tab="data";render();};
-window.addEventListener("resize",fitBinder);window.addEventListener("orientationchange",function(){setTimeout(fitBinder,200);});
+document.addEventListener("click",function(e){
+  var d=document.documentElement;if(!d.classList.contains("imm"))return;
+  var t=e.target;if(!t||!t.closest)return;
+  if(t.id==="immh"){setChrome(true);return;}
+  if(t.closest("header,.ctop,.bfoot")){if(isChrome())setChrome(true);setTimeout(fitBinder,0);return;}
+  if(t.closest("[data-a],button,a,input,select,label,dialog"))return;
+  setChrome(!isChrome());
+});
+window.addEventListener("resize",function(){if(S.tab==="col"&&S.view==="binder"&&S.shelf===false&&spreadOn()!==lastSpread){render();}else{applyImm();fitBinder();}});window.addEventListener("orientationchange",function(){setTimeout(function(){render();},250);});
 setTimeout(function(){checkUpdate(false);},1500);
 setTimeout(function(){
   if(!S.settings.autoPrices||!(S.cards.length+S.wish.length))return;
